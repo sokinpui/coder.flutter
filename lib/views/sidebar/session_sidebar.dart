@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/hover_animated_button.dart';
 import '../../models/session_info.dart';
 import '../../state/coder_state.dart';
 import '../settings/server_settings_dialog.dart';
@@ -95,25 +96,37 @@ class SessionSidebar extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: FilledButton.tonalIcon(
-        onPressed: () {
+      child: HoverAnimatedButton(
+        tooltip: 'Start new chat session',
+        hoverScale: 1.03,
+        onTap: () {
           state.newChat();
           onSessionSelected?.call();
         },
-        icon: const Icon(Icons.add, size: 18),
-        label: const Text(
-          'New Chat',
-          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-        ),
-        style: FilledButton.styleFrom(
-          backgroundColor: isDark
-              ? AppTheme.surfaceSubtle
-              : AppTheme.lightSurfaceSubtle,
-          foregroundColor: textColor,
-          side: BorderSide(color: theme.dividerColor),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          elevation: 0,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+          decoration: BoxDecoration(
+            color: isDark
+                ? AppTheme.surfaceSubtle
+                : AppTheme.lightSurfaceSubtle,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: theme.dividerColor),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.add, size: 18, color: textColor),
+              const SizedBox(width: 8),
+              Text(
+                'New Chat',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  color: textColor,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

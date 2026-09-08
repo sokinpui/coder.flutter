@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../core/theme/app_theme.dart';
+import '../../core/theme/app_theme.dart';
+import '../core/widgets/hover_animated_button.dart';
 import '../core/utils/responsive.dart';
 import '../state/coder_state.dart';
 import 'chat/chat_view.dart';
@@ -34,7 +35,14 @@ class ResponsiveHome extends StatelessWidget {
             onPressed: () => Scaffold.of(ctx).openDrawer(),
           ),
         ),
-        title: GestureDetector(
+        title: HoverAnimatedButton(
+          tooltip: 'Rename conversation',
+          hoverScale: 1.03,
+          hoverColor: isDark
+              ? AppTheme.surfaceSubtle
+              : AppTheme.lightSurfaceSubtle,
+          borderRadius: BorderRadius.circular(8),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           onTap: () => _showRenameDialog(context),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -45,7 +53,7 @@ class ResponsiveHome extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 6),
               const Icon(
                 Icons.edit_outlined,
                 size: 14,
@@ -62,10 +70,14 @@ class ResponsiveHome extends StatelessWidget {
             tooltip: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
             onPressed: state.toggleTheme,
           ),
-          IconButton(
-            icon: const Icon(Icons.add),
+          HoverAnimatedButton(
             tooltip: 'New Chat',
-            onPressed: state.newChat,
+            hoverScale: 1.15,
+            onTap: state.newChat,
+            child: const Padding(
+              padding: EdgeInsets.all(8),
+              child: Icon(Icons.add, size: 20),
+            ),
           ),
         ],
       ),
@@ -120,43 +132,56 @@ class ResponsiveHome extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: GestureDetector(
-              onTap: () => _showRenameDialog(context),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Flexible(
-                    child: Text(
-                      state.sessionTitle,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: HoverAnimatedButton(
+                tooltip: 'Rename conversation',
+                hoverScale: 1.03,
+                hoverColor: isDark
+                    ? AppTheme.surfaceSubtle
+                    : AppTheme.lightSurfaceSubtle,
+                borderRadius: BorderRadius.circular(8),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                onTap: () => _showRenameDialog(context),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        state.sessionTitle,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  const Icon(
-                    Icons.edit_outlined,
-                    size: 14,
-                    color: AppTheme.textMuted,
-                  ),
-                ],
+                    const SizedBox(width: 6),
+                    const Icon(
+                      Icons.edit_outlined,
+                      size: 14,
+                      color: AppTheme.textMuted,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
           IconButton(
             icon: Icon(
               isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-              size: 20,
             ),
             tooltip: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
             onPressed: state.toggleTheme,
           ),
-          IconButton(
-            icon: const Icon(Icons.add, size: 20),
+          HoverAnimatedButton(
             tooltip: 'New Chat',
-            onPressed: state.newChat,
+            hoverScale: 1.15,
+            onTap: state.newChat,
+            child: const Padding(
+              padding: EdgeInsets.all(8),
+              child: Icon(Icons.add, size: 20),
+            ),
           ),
         ],
       ),

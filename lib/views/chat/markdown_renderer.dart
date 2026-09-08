@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../core/theme/app_theme.dart';
+import 'collapsible_code_block.dart';
 
 class MarkdownRenderer extends StatelessWidget {
   const MarkdownRenderer({super.key, required this.content});
@@ -24,12 +24,15 @@ class MarkdownRenderer extends StatelessWidget {
     var i = 0;
     while (i < lines.length) {
       final line = lines[i];
+      final trimmedLine = line.trim();
 
-      if (line.trim().startsWith('```')) {
-        final lang = line.trim().substring(3).trim();
+      final fenceMatch = RegExp(r'^(`{3,}|~{3,})(.*)$').firstMatch(trimmedLine);
+      if (fenceMatch != null) {
+        final fence = fenceMatch.group(1)!;
+        final lang = fenceMatch.group(2)!.trim();
         final codeLines = <String>[];
         i++;
-        while (i < lines.length && !lines[i].trim().startsWith('```')) {
+        while (i < lines.length && !lines[i].trim().startsWith(fence)) {
           codeLines.add(lines[i]);
           i++;
         }
@@ -147,7 +150,10 @@ class MarkdownRenderer extends StatelessWidget {
       case _BlockType.heading:
         return _renderHeading(context, block.content, block.level);
       case _BlockType.code:
-        return _renderCodeBlock(context, block.language, block.content);
+        return CollapsibleCodeBlock(
+          language: block.language,
+          code: block.content,
+        );
       case _BlockType.quote:
         return _renderQuote(context, block.content);
       case _BlockType.unorderedList:
@@ -201,83 +207,6 @@ class MarkdownRenderer extends StatelessWidget {
           color: baseColor,
           height: 1.3,
         ),
-      ),
-    );
-  }
-
-  Widget _renderCodeBlock(BuildContext context, String lang, String code) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final bgColor = isDark ? AppTheme.background : const Color(0xFFF1F3F5);
-    final headerColor = isDark
-        ? AppTheme.surfaceSubtle
-        : const Color(0xFFE9ECEF);
-    final label = lang.trim().isEmpty ? 'code' : lang.trim();
-
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: theme.dividerColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: headerColor,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(8),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: isDark
-                        ? AppTheme.textMuted
-                        : AppTheme.lightTextMuted,
-                    fontSize: 11,
-                    fontFamily: 'monospace',
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.copy, size: 14),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  tooltip: 'Copy Code',
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(text: code));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Code copied to clipboard'),
-                        duration: Duration(seconds: 1),
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.all(12),
-            child: SelectableText(
-              code.trimRight(),
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 12.5,
-                color: isDark ? AppTheme.textMain : AppTheme.lightTextMain,
-                height: 1.35,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

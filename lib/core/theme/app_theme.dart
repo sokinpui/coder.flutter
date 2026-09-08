@@ -48,6 +48,15 @@ class AppTheme {
         thickness: 1,
         space: 1,
       ),
+      tooltipTheme: TooltipThemeData(
+        waitDuration: const Duration(seconds: 1),
+        decoration: BoxDecoration(
+          color: surfaceSubtle,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: border),
+        ),
+        textStyle: const TextStyle(color: textMain, fontSize: 12),
+      ),
     );
   }
 
@@ -78,6 +87,15 @@ class AppTheme {
         color: lightBorder,
         thickness: 1,
         space: 1,
+      ),
+      tooltipTheme: TooltipThemeData(
+        waitDuration: const Duration(seconds: 1),
+        decoration: BoxDecoration(
+          color: lightSurface,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: lightBorder),
+        ),
+        textStyle: const TextStyle(color: lightTextMain, fontSize: 12),
       ),
     );
   }

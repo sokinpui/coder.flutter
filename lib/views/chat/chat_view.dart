@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/services/clipboard_service.dart';
+import '../../core/widgets/hover_animated_button.dart';
 import '../../core/theme/app_theme.dart';
 import '../../state/coder_state.dart';
 import 'message_bubble.dart';
@@ -470,7 +471,10 @@ class _ChatViewState extends State<ChatView> {
               decoration: InputDecoration(
                 hintText:
                     'Start typing a prompt... (${_isMac ? 'Cmd+Enter' : 'Ctrl+Enter'} to send)',
-                hintStyle: const TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                hintStyle: const TextStyle(
+                  color: AppTheme.textMuted,
+                  fontSize: 13,
+                ),
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 10,
@@ -561,19 +565,49 @@ class _ChatViewState extends State<ChatView> {
                 ],
                 const Spacer(),
                 if (widget.state.isGenerating)
-                  IconButton.filled(
-                    onPressed: widget.state.cancelGeneration,
-                    icon: const Icon(Icons.stop, size: 18),
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppTheme.accentPink,
-                    ),
+                  HoverAnimatedButton(
                     tooltip: 'Cancel (Esc)',
+                    hoverScale: 1.10,
+                    onTap: widget.state.cancelGeneration,
+                    child: Container(
+                      width: 34,
+                      height: 34,
+                      decoration: const BoxDecoration(
+                        color: AppTheme.accentPink,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.stop,
+                        size: 18,
+                        color: Colors.white,
+                      ),
+                    ),
                   )
                 else
-                  IconButton.filled(
-                    onPressed: _submit,
-                    icon: const Icon(Icons.arrow_upward, size: 18),
+                  HoverAnimatedButton(
                     tooltip: 'Send (${_isMac ? 'Cmd+Enter' : 'Ctrl+Enter'})',
+                    hoverScale: 1.12,
+                    onTap: _submit,
+                    child: Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.primary.withOpacity(0.35),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.arrow_upward,
+                        size: 18,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
               ],
             ),

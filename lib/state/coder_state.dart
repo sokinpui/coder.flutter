@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../core/services/settings_service.dart';
 import '../core/rpc/coder_rpc_client.dart';
 import '../models/chat_message.dart';
 import '../models/session_info.dart';
@@ -12,10 +13,11 @@ enum ConnectionStateStatus { disconnected, connecting, connected, error }
 class CoderState extends ChangeNotifier {
   CoderState() {
     _client.onNotification = _onServerNotification;
-    initConnection();
+    _loadSavedSettingsAndConnect();
   }
 
   final CoderRpcClient _client = CoderRpcClient();
+  final SettingsService _settingsService = SettingsService.create();
 
   String _serverHost = '127.0.0.1';
   int _serverPort = 9005;
@@ -53,16 +55,57 @@ class CoderState extends ChangeNotifier {
     return '$scheme://$_serverHost:$_serverPort/ws';
   }
 
+  Future<void> _loadSavedSettingsAndConnect() async {
+    final settings = await _settingsService.loadSettings();
+    if (settings.containsKey('serverHost')) {
+      _serverHost = settings['serverHost'] as String;
+    }
+    if (settings.containsKey('serverPort')) {
+      _serverPort = settings['serverPort'] as int;
+    }
+    if (settings.containsKey('useTls')) {
+      _useTls = settings['useTls'] as bool;
+    }
+    if (settings.containsKey('themeMode')) {
+      final modeStr = settings['themeMode'] as String;
+      _themeMode = modeStr == 'light' ? ThemeMode.light : ThemeMode.dark;
+    }
+    if (settings.containsKey('isSidebarVisible')) {
+      _isSidebarVisible = settings['isSidebarVisible'] as bool;
+    }
+    if (settings.containsKey('activeModel')) {
+      final modelStr = settings['activeModel'] as String;
+      if (modelStr.isNotEmpty) {
+        _activeModel = modelStr;
+      }
+    }
+    notifyListeners();
+    await initConnection();
+  }
+
+  Future<void> _persistSettings() async {
+    await _settingsService.saveSettings({
+      'serverHost': _serverHost,
+      'serverPort': _serverPort,
+      'useTls': _useTls,
+      'themeMode': _themeMode == ThemeMode.light ? 'light' : 'dark',
+      'isSidebarVisible': _isSidebarVisible,
+      'activeModel': _activeModel,
+    });
+  }
+
   void toggleTheme() {
     _themeMode = _themeMode == ThemeMode.dark
         ? ThemeMode.light
         : ThemeMode.dark;
     notifyListeners();
+    _persistSettings();
   }
 
   void toggleSidebar() {
     _isSidebarVisible = !_isSidebarVisible;
     notifyListeners();
+    _persistSettings();
   }
 
   Future<void> updateServerAddress(
@@ -83,6 +126,7 @@ class CoderState extends ChangeNotifier {
     _serverPort = port;
     _useTls = tls;
     notifyListeners();
+    await _persistSettings();
     await initConnection();
   }
 
@@ -405,6 +449,7 @@ class CoderState extends ChangeNotifier {
         _activeModel = model;
       }
       notifyListeners();
+      await _persistSettings();
     } catch (_) {}
   }
 
@@ -416,7 +461,7 @@ class CoderState extends ChangeNotifier {
         if (list != null) {
           _availableModels = list.map((e) => e.toString()).toList();
         }
-        if (res.containsKey('current')) {
+        if (res.containsKey('current') && _activeModel == 'default') {
           _activeModel = res['current'] as String;
         }
         notifyListeners();

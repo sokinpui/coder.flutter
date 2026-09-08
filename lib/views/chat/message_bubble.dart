@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/hover_animated_button.dart';
 import '../../models/chat_message.dart';
 import 'markdown_renderer.dart';
 import 'generating_indicator.dart';
@@ -225,22 +226,24 @@ class _MessageBubbleState extends State<MessageBubble> {
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
           if (isUser && widget.onEdit != null)
-            IconButton(
-              icon: const Icon(
-                Icons.edit_outlined,
-                size: 14,
-                color: AppTheme.textMuted,
-              ),
+            HoverAnimatedButton(
               tooltip: 'Edit Message',
-              onPressed: () {
+              hoverScale: 1.15,
+              onTap: () {
                 _editController.text = msg.content;
                 setState(() => _isEditing = true);
                 WidgetsBinding.instance.addPostFrameCallback(
                   (_) => _editFocusNode.requestFocus(),
                 );
               },
-              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-              padding: EdgeInsets.zero,
+              child: const Padding(
+                padding: EdgeInsets.all(6),
+                child: Icon(
+                  Icons.edit_outlined,
+                  size: 15,
+                  color: AppTheme.textMuted,
+                ),
+              ),
             ),
           if (!isUser && hasDiff && widget.onApplyItf != null)
             IconButton(

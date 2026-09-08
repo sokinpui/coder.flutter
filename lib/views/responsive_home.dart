@@ -34,34 +34,25 @@ class ResponsiveHome extends StatelessWidget {
             onPressed: () => Scaffold.of(ctx).openDrawer(),
           ),
         ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            GestureDetector(
-              onTap: () => _showRenameDialog(context),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Flexible(
-                    child: Text(
-                      state.sessionTitle,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(
-                    Icons.edit_outlined,
-                    size: 14,
-                    color: AppTheme.textMuted,
-                  ),
-                ],
+        title: GestureDetector(
+          onTap: () => _showRenameDialog(context),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  state.sessionTitle,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-            ),
-            Text(
-              'Model: ${state.activeModel}${state.tokenCount > 0 ? ' • ≈${state.tokenCount} tokens' : ''}',
-              style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
-            ),
-          ],
+              const SizedBox(width: 4),
+              const Icon(
+                Icons.edit_outlined,
+                size: 14,
+                color: AppTheme.textMuted,
+              ),
+            ],
+          ),
         ),
         actions: [
           IconButton(
@@ -154,65 +145,6 @@ class ResponsiveHome extends StatelessWidget {
               ),
             ),
           ),
-          if (state.tokenCount > 0) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? AppTheme.surfaceSubtle
-                    : AppTheme.lightSurfaceSubtle,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: Theme.of(context).dividerColor),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.toll_outlined,
-                    size: 13,
-                    color: Colors.greenAccent,
-                  ),
-                  const SizedBox(width: 5),
-                  Text(
-                    '≈${state.tokenCount}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontFamily: 'monospace',
-                      color: isDark
-                          ? AppTheme.textMain
-                          : AppTheme.lightTextMain,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-          ],
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? AppTheme.surfaceSubtle
-                  : AppTheme.lightSurfaceSubtle,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: Theme.of(context).dividerColor),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.memory, size: 14, color: AppTheme.primary),
-                const SizedBox(width: 6),
-                Text(
-                  state.activeModel,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isDark ? AppTheme.textMain : AppTheme.lightTextMain,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
           IconButton(
             icon: Icon(
               isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,

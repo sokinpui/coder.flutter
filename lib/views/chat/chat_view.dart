@@ -25,6 +25,33 @@ class _ChatViewState extends State<ChatView> {
   final List<Uint8List> _stagedImages = [];
   StreamSubscription<Uint8List>? _pastedImageSub;
 
+  bool get _isMac =>
+      defaultTargetPlatform == TargetPlatform.macOS ||
+      defaultTargetPlatform == TargetPlatform.iOS;
+
+  bool _isModifierPressed() {
+    try {
+      if (_isMac) {
+        return HardwareKeyboard.instance.isMetaPressed ||
+            HardwareKeyboard.instance.isLogicalKeyPressed(
+              LogicalKeyboardKey.metaLeft,
+            ) ||
+            HardwareKeyboard.instance.isLogicalKeyPressed(
+              LogicalKeyboardKey.metaRight,
+            );
+      }
+      return HardwareKeyboard.instance.isControlPressed ||
+          HardwareKeyboard.instance.isLogicalKeyPressed(
+            LogicalKeyboardKey.controlLeft,
+          ) ||
+          HardwareKeyboard.instance.isLogicalKeyPressed(
+            LogicalKeyboardKey.controlRight,
+          );
+    } catch (_) {
+      return false;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -112,44 +139,22 @@ class _ChatViewState extends State<ChatView> {
       return KeyEventResult.handled;
     }
 
-    final isMac =
-        defaultTargetPlatform == TargetPlatform.macOS ||
-        defaultTargetPlatform == TargetPlatform.iOS;
-    bool isPasteModifier = false;
-    try {
-      isPasteModifier = isMac
-          ? HardwareKeyboard.instance.isMetaPressed ||
-                HardwareKeyboard.instance.isLogicalKeyPressed(
-                  LogicalKeyboardKey.metaLeft,
-                ) ||
-                HardwareKeyboard.instance.isLogicalKeyPressed(
-                  LogicalKeyboardKey.metaRight,
-                )
-          : HardwareKeyboard.instance.isControlPressed ||
-                HardwareKeyboard.instance.isLogicalKeyPressed(
-                  LogicalKeyboardKey.controlLeft,
-                ) ||
-                HardwareKeyboard.instance.isLogicalKeyPressed(
-                  LogicalKeyboardKey.controlRight,
-                );
-    } catch (_) {}
+    final isModifierActive = _isModifierPressed();
 
-    if (event.logicalKey == LogicalKeyboardKey.keyV && isPasteModifier) {
+    if (event.logicalKey == LogicalKeyboardKey.keyV && isModifierActive) {
       _pasteClipboardImage();
       _maintainInputFocus();
     }
 
-    if (event.logicalKey == LogicalKeyboardKey.enter &&
-        _inputFocusNode.hasFocus) {
-      bool isShiftPressed = false;
-      try {
-        isShiftPressed = HardwareKeyboard.instance.isShiftPressed;
-      } catch (_) {}
-      if (!isShiftPressed) {
-        _submit();
-        return KeyEventResult.handled;
-      }
+    final isEnter =
+        event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.numpadEnter;
+
+    if (isEnter && _inputFocusNode.hasFocus && isModifierActive) {
+      _submit();
+      return KeyEventResult.handled;
     }
+
     return KeyEventResult.ignored;
   }
 
@@ -462,12 +467,12 @@ class _ChatViewState extends State<ChatView> {
                 fontSize: 14,
                 color: isDark ? AppTheme.textMain : AppTheme.lightTextMain,
               ),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText:
-                    'Start typing a prompt... (Enter to send, Shift+Enter for newline)',
-                hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                    'Start typing a prompt... (${_isMac ? 'Cmd+Enter' : 'Ctrl+Enter'} to send)',
+                hintStyle: const TextStyle(color: AppTheme.textMuted, fontSize: 13),
                 border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(
+                contentPadding: const EdgeInsets.symmetric(
                   horizontal: 10,
                   vertical: 8,
                 ),
@@ -568,7 +573,7 @@ class _ChatViewState extends State<ChatView> {
                   IconButton.filled(
                     onPressed: _submit,
                     icon: const Icon(Icons.arrow_upward, size: 18),
-                    tooltip: 'Send',
+                    tooltip: 'Send (${_isMac ? 'Cmd+Enter' : 'Ctrl+Enter'})',
                   ),
               ],
             ),

@@ -106,7 +106,19 @@ class _MessageBubbleState extends State<MessageBubble> {
                     _buildInlineEditor(context, isDark)
                   else if (!isImageMsg &&
                       widget.message.content.isNotEmpty) ...[
-                    MarkdownRenderer(content: widget.message.content),
+                    if (widget.message.author == MessageAuthor.user)
+                      SelectableText(
+                        widget.message.content,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          height: 1.45,
+                          color: isDark
+                              ? AppTheme.textMain
+                              : AppTheme.lightTextMain,
+                        ),
+                      )
+                    else
+                      MarkdownRenderer(content: widget.message.content),
                     if (widget.message.isGenerating)
                       const Padding(
                         padding: EdgeInsets.only(top: 6),

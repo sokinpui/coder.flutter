@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_icon_widget.dart';
 import '../../core/widgets/hover_animated_button.dart';
 import '../../models/session_info.dart';
 import '../../state/coder_state.dart';
@@ -61,7 +62,7 @@ class SessionSidebar extends StatelessWidget {
           children: [
             const Row(
               children: [
-                Icon(Icons.terminal, color: AppTheme.primary, size: 20),
+                AppIconWidget(size: 22),
                 SizedBox(width: 8),
                 Text(
                   'CODER',

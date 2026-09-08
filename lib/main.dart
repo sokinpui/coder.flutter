@@ -39,7 +39,9 @@ class _MyAppState extends State<MyApp> {
         return MaterialApp(
           title: 'Coder',
           debugShowCheckedModeBanner: false,
-          theme: AppTheme.darkTheme(),
+          theme: AppTheme.lightTheme(),
+          darkTheme: AppTheme.darkTheme(),
+          themeMode: _coderState.themeMode,
           home: ResponsiveHome(state: _coderState),
         );
       },

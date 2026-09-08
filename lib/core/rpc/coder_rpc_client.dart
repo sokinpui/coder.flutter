@@ -97,7 +97,9 @@ class CoderRpcClient {
 
       if (msg.containsKey('error') && msg['error'] != null) {
         final err = msg['error'];
-        final message = err is Map ? err['message'] ?? 'RPC Error' : err.toString();
+        final message = err is Map
+            ? err['message'] ?? 'RPC Error'
+            : err.toString();
         completer.completeError(message);
         return;
       }

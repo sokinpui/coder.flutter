@@ -6,22 +6,29 @@ import '../../state/coder_state.dart';
 import '../settings/server_settings_dialog.dart';
 
 class SessionSidebar extends StatelessWidget {
-  const SessionSidebar({super.key, required this.state, this.onSessionSelected});
+  const SessionSidebar({
+    super.key,
+    required this.state,
+    this.onSessionSelected,
+  });
 
   final CoderState state;
   final VoidCallback? onSessionSelected;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       width: 280,
-      color: AppTheme.surface,
+      color: isDark ? AppTheme.surface : AppTheme.lightSurface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildHeader(context),
-          _buildNewChatButton(),
-          _buildModelSelector(),
+          _buildNewChatButton(context),
+          _buildModelSelector(context),
           const Divider(),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -81,27 +88,42 @@ class SessionSidebar extends StatelessWidget {
     );
   }
 
-  Widget _buildNewChatButton() {
+  Widget _buildNewChatButton(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final textColor = isDark ? AppTheme.textMain : AppTheme.lightTextMain;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: OutlinedButton.icon(
+      child: FilledButton.tonalIcon(
         onPressed: () {
           state.newChat();
           onSessionSelected?.call();
         },
         icon: const Icon(Icons.add, size: 18),
-        label: const Text('New Chat'),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppTheme.textMain,
-          side: const BorderSide(color: AppTheme.border),
+        label: const Text(
+          'New Chat',
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+        ),
+        style: FilledButton.styleFrom(
+          backgroundColor: isDark
+              ? AppTheme.surfaceSubtle
+              : AppTheme.lightSurfaceSubtle,
+          foregroundColor: textColor,
+          side: BorderSide(color: theme.dividerColor),
           padding: const EdgeInsets.symmetric(vertical: 12),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          elevation: 0,
         ),
       ),
     );
   }
 
-  Widget _buildModelSelector() {
+  Widget _buildModelSelector(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final textColor = isDark ? AppTheme.textMain : AppTheme.lightTextMain;
+
     if (state.availableModels.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -116,18 +138,41 @@ class SessionSidebar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: DropdownButtonFormField<String>(
         isExpanded: true,
-        value: state.availableModels.contains(state.activeModel) ? state.activeModel : null,
+        initialValue: state.availableModels.contains(state.activeModel)
+            ? state.activeModel
+            : null,
         isDense: true,
         decoration: InputDecoration(
           labelText: 'Active Model',
           labelStyle: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: theme.dividerColor),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: theme.dividerColor),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: AppTheme.primary),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 10,
+            vertical: 8,
+          ),
         ),
-        dropdownColor: AppTheme.surfaceSubtle,
-        style: const TextStyle(color: AppTheme.textMain, fontSize: 12),
+        dropdownColor: isDark ? AppTheme.surfaceSubtle : AppTheme.lightSurface,
+        style: TextStyle(color: textColor, fontSize: 12),
         items: state.availableModels.map((m) {
-          return DropdownMenuItem(value: m, child: Text(m, overflow: TextOverflow.ellipsis));
+          return DropdownMenuItem(
+            value: m,
+            child: Text(
+              m,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: textColor, fontSize: 12),
+            ),
+          );
         }).toList(),
         onChanged: (model) {
           if (model != null) {
@@ -155,6 +200,7 @@ class SessionSidebar extends StatelessWidget {
         final session = state.historySessions[index];
         return _SessionItem(
           session: session,
+          state: state,
           onTap: () {
             state.loadSession(session.filename);
             onSessionSelected?.call();
@@ -165,8 +211,10 @@ class SessionSidebar extends StatelessWidget {
   }
 
   Widget _buildFooter(BuildContext context) {
-    final isConnected = state.connectionStatus == ConnectionStateStatus.connected;
+    final isConnected =
+        state.connectionStatus == ConnectionStateStatus.connected;
     final statusColor = isConnected ? Colors.green : Colors.redAccent;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -175,7 +223,10 @@ class SessionSidebar extends StatelessWidget {
           Container(
             width: 8,
             height: 8,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: statusColor),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: statusColor,
+            ),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -188,7 +239,19 @@ class SessionSidebar extends StatelessWidget {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.refresh, size: 16, color: AppTheme.textMuted),
+            icon: Icon(
+              isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+              size: 16,
+            ),
+            tooltip: isDark ? 'Light Theme' : 'Dark Theme',
+            onPressed: state.toggleTheme,
+          ),
+          IconButton(
+            icon: const Icon(
+              Icons.refresh,
+              size: 16,
+              color: AppTheme.textMuted,
+            ),
             tooltip: 'Reconnect',
             onPressed: () => state.initConnection(),
           ),
@@ -199,25 +262,79 @@ class SessionSidebar extends StatelessWidget {
 }
 
 class _SessionItem extends StatelessWidget {
-  const _SessionItem({required this.session, required this.onTap});
+  const _SessionItem({
+    required this.session,
+    required this.state,
+    required this.onTap,
+  });
 
   final SessionInfo session;
+  final CoderState state;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ListTile(
       dense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-      leading: const Icon(Icons.chat_bubble_outline, size: 16, color: AppTheme.textMuted),
+      leading: const Icon(
+        Icons.chat_bubble_outline,
+        size: 16,
+        color: AppTheme.textMuted,
+      ),
       title: Text(
         session.title,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontSize: 13, color: AppTheme.textMain),
+        style: TextStyle(
+          fontSize: 13,
+          color: isDark ? AppTheme.textMain : AppTheme.lightTextMain,
+        ),
+      ),
+      trailing: IconButton(
+        icon: const Icon(Icons.more_horiz, size: 16, color: AppTheme.textMuted),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(),
+        onPressed: () => _showSessionOptions(context),
       ),
       onTap: onTap,
+    );
+  }
+
+  void _showSessionOptions(BuildContext context) {
+    final controller = TextEditingController(text: session.title);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text(
+          'Rename Conversation',
+          style: TextStyle(fontSize: 16),
+        ),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'New Title',
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              state.renameSession(controller.text);
+              Navigator.of(ctx).pop();
+            },
+            child: const Text('Rename'),
+          ),
+        ],
+      ),
     );
   }
 }

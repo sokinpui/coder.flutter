@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 
 import '../core/rpc/coder_rpc_client.dart';
 import '../models/chat_message.dart';
@@ -19,6 +20,8 @@ class CoderState extends ChangeNotifier {
   String _serverHost = '127.0.0.1';
   int _serverPort = 9005;
   bool _useTls = kIsWeb && Uri.base.scheme == 'https';
+  ThemeMode _themeMode = ThemeMode.dark;
+  bool _isSidebarVisible = true;
   String _activeModel = 'default';
   String _sessionTitle = 'New Chat';
   List<String> _availableModels = [];
@@ -33,6 +36,8 @@ class CoderState extends ChangeNotifier {
   String get serverHost => _serverHost;
   int get serverPort => _serverPort;
   bool get useTls => _useTls;
+  ThemeMode get themeMode => _themeMode;
+  bool get isSidebarVisible => _isSidebarVisible;
   String get activeModel => _activeModel;
   String get sessionTitle => _sessionTitle;
   List<String> get availableModels => _availableModels;
@@ -48,7 +53,23 @@ class CoderState extends ChangeNotifier {
     return '$scheme://$_serverHost:$_serverPort/ws';
   }
 
-  Future<void> updateServerAddress(String host, int port, {bool? useTls}) async {
+  void toggleTheme() {
+    _themeMode = _themeMode == ThemeMode.dark
+        ? ThemeMode.light
+        : ThemeMode.dark;
+    notifyListeners();
+  }
+
+  void toggleSidebar() {
+    _isSidebarVisible = !_isSidebarVisible;
+    notifyListeners();
+  }
+
+  Future<void> updateServerAddress(
+    String host,
+    int port, {
+    bool? useTls,
+  }) async {
     var cleanedHost = host.trim();
     var tls = useTls ?? _useTls;
     if (cleanedHost.startsWith('ws://')) {
@@ -86,11 +107,14 @@ class CoderState extends ChangeNotifier {
 
   Future<void> _initializeRemoteSession() async {
     try {
-      final res = await _client.request('session/init', {
-        'mode': 'chat',
-      });
-      if (res is Map && res.containsKey('model')) {
-        _activeModel = res['model'] as String;
+      final res = await _client.request('session/init', {'mode': 'chat'});
+      if (res is Map) {
+        if (res.containsKey('model')) {
+          _activeModel = res['model'] as String;
+        }
+        if (res.containsKey('tokenCount')) {
+          _tokenCount = (res['tokenCount'] as num?)?.toInt() ?? 0;
+        }
       }
       _sessionTitle = 'New Chat';
       _messages.clear();
@@ -100,6 +124,7 @@ class CoderState extends ChangeNotifier {
 
   Future<void> newChat() async {
     _isGenerating = false;
+    _tokenCount = 0;
     _messages.clear();
     _sessionTitle = 'New Chat';
     notifyListeners();
@@ -116,18 +141,22 @@ class CoderState extends ChangeNotifier {
       return;
     }
 
-    final effectivePrompt = prompt.isEmpty && hasImages ? 'What is in this image?' : prompt;
+    final effectivePrompt = prompt.isEmpty && hasImages
+        ? 'What is in this image?'
+        : prompt;
     final baseTimestamp = DateTime.now().millisecondsSinceEpoch;
     var offset = 0;
 
     if (hasImages) {
       for (final img in images) {
-        _messages.add(ChatMessage(
-          id: (baseTimestamp + offset++).toString(),
-          author: MessageAuthor.image,
-          content: 'Image',
-          imageData: img,
-        ));
+        _messages.add(
+          ChatMessage(
+            id: (baseTimestamp + offset++).toString(),
+            author: MessageAuthor.image,
+            content: 'Image',
+            imageData: img,
+          ),
+        );
       }
     }
 
@@ -143,6 +172,7 @@ class CoderState extends ChangeNotifier {
       author: MessageAuthor.assistant,
       content: '',
       reasoning: '',
+      isGenerating: true,
     );
     _messages.add(aiMsg);
 
@@ -150,15 +180,14 @@ class CoderState extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final params = <String, dynamic>{
-        'content': effectivePrompt,
-      };
+      final params = <String, dynamic>{'content': effectivePrompt};
       if (hasImages) {
         params['images'] = images.map(base64Encode).toList();
       }
       await _client.request('session/prompt', params);
     } catch (e) {
       aiMsg.content = 'Error sending prompt: $e';
+      aiMsg.isGenerating = false;
       _isGenerating = false;
       notifyListeners();
     }
@@ -172,7 +201,199 @@ class CoderState extends ChangeNotifier {
       await _client.request('session/cancel');
     } catch (_) {}
     _isGenerating = false;
+    if (_messages.isNotEmpty &&
+        _messages.last.author == MessageAuthor.assistant) {
+      _messages.last.isGenerating = false;
+    }
     notifyListeners();
+  }
+
+  Future<void> renameSession(String newTitle) async {
+    final trimmed = newTitle.trim();
+    if (trimmed.isEmpty) {
+      return;
+    }
+    _sessionTitle = trimmed;
+    notifyListeners();
+    try {
+      await _client.request('session/rename', {'title': trimmed});
+      await fetchHistory();
+    } catch (_) {}
+  }
+
+  Future<void> deleteMessage(String id) async {
+    final index = _messages.indexWhere((m) => m.id == id);
+    if (index == -1) {
+      return;
+    }
+    _messages.removeAt(index);
+    notifyListeners();
+    try {
+      final res = await _client.request('session/message/delete', {
+        'index': index,
+      });
+      if (res is Map && res.containsKey('tokenCount')) {
+        _tokenCount = (res['tokenCount'] as num?)?.toInt() ?? _tokenCount;
+        notifyListeners();
+      }
+      await fetchHistory();
+    } catch (_) {}
+  }
+
+  Future<void> regenerateFrom(String messageId) async {
+    if (_isGenerating) {
+      return;
+    }
+    final index = _messages.indexWhere((m) => m.id == messageId);
+    if (index == -1) {
+      return;
+    }
+
+    final targetMsg = _messages[index];
+    int promptMsgIndex = -1;
+    if (targetMsg.author == MessageAuthor.assistant) {
+      for (var i = index - 1; i >= 0; i--) {
+        if (_messages[i].author == MessageAuthor.user) {
+          promptMsgIndex = i;
+          break;
+        }
+      }
+    } else if (targetMsg.author == MessageAuthor.user) {
+      promptMsgIndex = index;
+    } else if (targetMsg.author == MessageAuthor.image) {
+      for (var i = index + 1; i < _messages.length; i++) {
+        if (_messages[i].author == MessageAuthor.user) {
+          promptMsgIndex = i;
+          break;
+        }
+      }
+    }
+
+    if (promptMsgIndex == -1) {
+      return;
+    }
+
+    _messages.removeRange(promptMsgIndex + 1, _messages.length);
+
+    final aiMsg = ChatMessage(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      author: MessageAuthor.assistant,
+      content: '',
+      reasoning: '',
+      isGenerating: true,
+    );
+    _messages.add(aiMsg);
+    _isGenerating = true;
+    notifyListeners();
+
+    try {
+      await _client.request('session/regenerate', {'index': promptMsgIndex});
+    } catch (e) {
+      aiMsg.content = 'Error regenerating: $e';
+      aiMsg.isGenerating = false;
+      _isGenerating = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> editMessage(String id, String newContent) async {
+    final trimmed = newContent.trim();
+    if (trimmed.isEmpty) {
+      return;
+    }
+
+    final index = _messages.indexWhere((m) => m.id == id);
+    if (index == -1) {
+      return;
+    }
+
+    _messages[index].content = trimmed;
+    notifyListeners();
+
+    try {
+      final res = await _client.request('session/message/edit', {
+        'index': index,
+        'content': trimmed,
+      });
+      if (res is Map && res.containsKey('tokenCount')) {
+        _tokenCount = (res['tokenCount'] as num?)?.toInt() ?? _tokenCount;
+        notifyListeners();
+      }
+      await fetchHistory();
+    } catch (_) {}
+  }
+
+  Future<void> branchFrom(String messageId) async {
+    if (_isGenerating) {
+      return;
+    }
+    final index = _messages.indexWhere((m) => m.id == messageId);
+    if (index == -1) {
+      return;
+    }
+
+    try {
+      final res = await _client.request('session/branch', {'index': index});
+      if (res is Map) {
+        _sessionTitle = res['title'] as String? ?? 'Branched Chat';
+        if (res.containsKey('tokenCount')) {
+          _tokenCount = (res['tokenCount'] as num?)?.toInt() ?? 0;
+        }
+        _messages.clear();
+        _messages.addAll(_parseMessagesFromRaw(res['messages'] as List?));
+        notifyListeners();
+        await fetchHistory();
+      }
+    } catch (e) {
+      _errorMessage = 'Failed to branch session: $e';
+      notifyListeners();
+    }
+  }
+
+  List<ChatMessage> _parseMessagesFromRaw(List? rawMsgs) {
+    if (rawMsgs == null) return [];
+    final result = <ChatMessage>[];
+    for (final m in rawMsgs) {
+      if (m is! Map) continue;
+      final typeInt = m['Type'] as int? ?? 0;
+      final content = m['Content'] as String? ?? '';
+      final isImage = typeInt == 7;
+      final isAssistant = typeInt == 1;
+
+      Uint8List? imgData;
+      if (isImage && m['Data'] is String && (m['Data'] as String).isNotEmpty) {
+        try {
+          imgData = base64Decode(m['Data'] as String);
+        } catch (_) {}
+      }
+
+      result.add(
+        ChatMessage(
+          id: UniqueKey().toString(),
+          author: isImage
+              ? MessageAuthor.image
+              : (isAssistant ? MessageAuthor.assistant : MessageAuthor.user),
+          content: content,
+          imagePath: isImage ? content : null,
+          imageData: imgData,
+        ),
+      );
+    }
+    return result;
+  }
+
+  Future<String?> applyItf({String? content}) async {
+    try {
+      final params = <String, dynamic>{};
+      if (content != null && content.isNotEmpty) {
+        params['content'] = content;
+      }
+      final res = await _client.request('session/itf/apply', params);
+      if (res is Map && res.containsKey('summary')) {
+        return res['summary'] as String?;
+      }
+    } catch (_) {}
+    return null;
   }
 
   Future<void> setModel(String model) async {
@@ -221,42 +442,11 @@ class CoderState extends ChangeNotifier {
       final res = await _client.request('history/load', {'filename': filename});
       if (res is Map) {
         _sessionTitle = res['title'] as String? ?? 'Loaded Chat';
-        _messages.clear();
-
-        final rawMsgs = res['messages'] as List?;
-        if (rawMsgs != null) {
-          for (final m in rawMsgs) {
-            if (m is! Map) continue;
-            final typeInt = m['Type'] as int? ?? 0;
-            final content = m['Content'] as String? ?? '';
-            
-            MessageAuthor author;
-            String? imagePath;
-            Uint8List? imageData;
-            if (typeInt == 1) {
-              author = MessageAuthor.assistant;
-            } else if (typeInt == 7) {
-              author = MessageAuthor.image;
-              imagePath = content;
-              final rawData = m['Data'];
-              if (rawData is String && rawData.isNotEmpty) {
-                try {
-                  imageData = base64Decode(rawData);
-                } catch (_) {}
-              }
-            } else {
-              author = MessageAuthor.user;
-            }
-
-            _messages.add(ChatMessage(
-              id: UniqueKey().toString(),
-              author: author,
-              content: content,
-              imagePath: imagePath,
-              imageData: imageData,
-            ));
-          }
+        if (res.containsKey('tokenCount')) {
+          _tokenCount = (res['tokenCount'] as num?)?.toInt() ?? 0;
         }
+        _messages.clear();
+        _messages.addAll(_parseMessagesFromRaw(res['messages'] as List?));
         notifyListeners();
       }
     } catch (e) {
@@ -270,9 +460,11 @@ class CoderState extends ChangeNotifier {
       final content = params['content'] as String? ?? '';
       final reasoning = params['reasoningContent'] as String? ?? '';
       final done = params['done'] as bool? ?? false;
+      final tokenCount = (params['tokenCount'] as num?)?.toInt();
       final error = params['error'] as String?;
 
-      if (_messages.isNotEmpty && _messages.last.author == MessageAuthor.assistant) {
+      if (_messages.isNotEmpty &&
+          _messages.last.author == MessageAuthor.assistant) {
         final last = _messages.last;
         if (content.isNotEmpty) {
           last.content += content;
@@ -282,11 +474,19 @@ class CoderState extends ChangeNotifier {
         }
         if (error != null && error.isNotEmpty) {
           last.content += '\n\n[Error: $error]';
+          last.isGenerating = false;
         }
       }
 
       if (done) {
         _isGenerating = false;
+        if (tokenCount != null && tokenCount > 0) {
+          _tokenCount = tokenCount;
+        }
+        if (_messages.isNotEmpty &&
+            _messages.last.author == MessageAuthor.assistant) {
+          _messages.last.isGenerating = false;
+        }
         fetchHistory();
       }
       notifyListeners();

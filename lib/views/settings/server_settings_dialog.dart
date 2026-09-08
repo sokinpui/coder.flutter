@@ -21,7 +21,9 @@ class _ServerSettingsDialogState extends State<ServerSettingsDialog> {
   void initState() {
     super.initState();
     _hostController = TextEditingController(text: widget.state.serverHost);
-    _portController = TextEditingController(text: widget.state.serverPort.toString());
+    _portController = TextEditingController(
+      text: widget.state.serverPort.toString(),
+    );
     _useTls = widget.state.useTls;
   }
 
@@ -44,8 +46,10 @@ class _ServerSettingsDialogState extends State<ServerSettingsDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return AlertDialog(
-      backgroundColor: AppTheme.surface,
+      backgroundColor: isDark ? AppTheme.surface : AppTheme.lightSurface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       title: const Row(
         children: [
@@ -90,7 +94,10 @@ class _ServerSettingsDialogState extends State<ServerSettingsDialog> {
             const SizedBox(height: 12),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('Use Secure WebSocket (wss://)', style: TextStyle(fontSize: 13)),
+              title: const Text(
+                'Use Secure WebSocket (wss://)',
+                style: TextStyle(fontSize: 13),
+              ),
               subtitle: const Text(
                 'Required when accessing over HTTPS',
                 style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
@@ -106,10 +113,7 @@ class _ServerSettingsDialogState extends State<ServerSettingsDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
-        FilledButton(
-          onPressed: _saveSettings,
-          child: const Text('Connect'),
-        ),
+        FilledButton(onPressed: _saveSettings, child: const Text('Connect')),
       ],
     );
   }

@@ -10,6 +10,7 @@ class ChatMessage {
     this.reasoning = '',
     this.imagePath,
     this.imageData,
+    this.isGenerating = false,
     DateTime? timestamp,
   }) : timestamp = timestamp ?? DateTime.now();
 
@@ -19,5 +20,6 @@ class ChatMessage {
   String reasoning;
   final String? imagePath;
   final Uint8List? imageData;
+  bool isGenerating;
   final DateTime timestamp;
 }

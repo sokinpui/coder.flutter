@@ -9,13 +9,15 @@ WsTransport createTransport() => HtmlWsTransport();
 
 class HtmlWsTransport implements WsTransport {
   html.WebSocket? _socket;
-  final StreamController<String> _controller = StreamController<String>.broadcast();
+  final StreamController<String> _controller =
+      StreamController<String>.broadcast();
 
   @override
   Stream<String> get stream => _controller.stream;
 
   @override
-  bool get isConnected => _socket != null && _socket!.readyState == html.WebSocket.OPEN;
+  bool get isConnected =>
+      _socket != null && _socket!.readyState == html.WebSocket.OPEN;
 
   @override
   Future<void> connect(String url) async {

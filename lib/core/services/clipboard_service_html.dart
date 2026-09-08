@@ -15,7 +15,8 @@ class HtmlClipboardService implements ClipboardService {
   }
 
   Uint8List? _lastPastedImage;
-  final StreamController<Uint8List> _imageStreamController = StreamController<Uint8List>.broadcast();
+  final StreamController<Uint8List> _imageStreamController =
+      StreamController<Uint8List>.broadcast();
 
   @override
   Stream<Uint8List> get onImagePasted => _imageStreamController.stream;

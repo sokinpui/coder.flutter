@@ -7,13 +7,15 @@ WsTransport createTransport() => IOWsTransport();
 
 class IOWsTransport implements WsTransport {
   WebSocket? _socket;
-  final StreamController<String> _controller = StreamController<String>.broadcast();
+  final StreamController<String> _controller =
+      StreamController<String>.broadcast();
 
   @override
   Stream<String> get stream => _controller.stream;
 
   @override
-  bool get isConnected => _socket != null && _socket!.readyState == WebSocket.open;
+  bool get isConnected =>
+      _socket != null && _socket!.readyState == WebSocket.open;
 
   @override
   Future<void> connect(String url) async {

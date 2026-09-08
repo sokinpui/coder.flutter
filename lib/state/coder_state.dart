@@ -57,27 +57,29 @@ class CoderState extends ChangeNotifier {
 
   Future<void> _loadSavedSettingsAndConnect() async {
     final settings = await _settingsService.loadSettings();
-    if (settings.containsKey('serverHost')) {
-      _serverHost = settings['serverHost'] as String;
+    final host = settings['serverHost'] as String?;
+    if (host != null && host.isNotEmpty) {
+      _serverHost = host;
     }
-    if (settings.containsKey('serverPort')) {
-      _serverPort = settings['serverPort'] as int;
+    final port = (settings['serverPort'] as num?)?.toInt();
+    if (port != null && port > 0) {
+      _serverPort = port;
     }
-    if (settings.containsKey('useTls')) {
-      _useTls = settings['useTls'] as bool;
+    final tls = settings['useTls'] as bool?;
+    if (tls != null) {
+      _useTls = tls;
     }
-    if (settings.containsKey('themeMode')) {
-      final modeStr = settings['themeMode'] as String;
+    final modeStr = settings['themeMode'] as String?;
+    if (modeStr != null) {
       _themeMode = modeStr == 'light' ? ThemeMode.light : ThemeMode.dark;
     }
-    if (settings.containsKey('isSidebarVisible')) {
-      _isSidebarVisible = settings['isSidebarVisible'] as bool;
+    final isSidebar = settings['isSidebarVisible'] as bool?;
+    if (isSidebar != null) {
+      _isSidebarVisible = isSidebar;
     }
-    if (settings.containsKey('activeModel')) {
-      final modelStr = settings['activeModel'] as String;
-      if (modelStr.isNotEmpty) {
-        _activeModel = modelStr;
-      }
+    final modelStr = settings['activeModel'] as String?;
+    if (modelStr != null && modelStr.isNotEmpty) {
+      _activeModel = modelStr;
     }
     notifyListeners();
     await initConnection();
@@ -151,7 +153,11 @@ class CoderState extends ChangeNotifier {
 
   Future<void> _initializeRemoteSession() async {
     try {
-      final res = await _client.request('session/init', {'mode': 'chat'});
+      final params = <String, dynamic>{'mode': 'chat'};
+      if (_activeModel != 'default') {
+        params['model'] = _activeModel;
+      }
+      final res = await _client.request('session/init', params);
       if (res is Map) {
         if (res.containsKey('model')) {
           _activeModel = res['model'] as String;

@@ -36,7 +36,8 @@ dependencies:
   cupertino_icons: any
   flutter_highlight: any
   flutter_math_fork: any
-  gpt_markdown: any
+  markdown: any
+  markdown_widget: any
 
 dev_dependencies:
   flutter_test:

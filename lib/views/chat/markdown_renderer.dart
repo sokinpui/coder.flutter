@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_math_fork/flutter_math.dart';
 
 import '../../core/theme/app_theme.dart';
 import 'collapsible_code_block.dart';
@@ -37,12 +38,88 @@ class MarkdownRenderer extends StatelessWidget {
           i++;
         }
         if (i < lines.length) i++;
+        final lowerLang = lang.toLowerCase();
+        if (lowerLang == 'math' || lowerLang == 'latex' || lowerLang == 'tex') {
+          final codeContent = codeLines.join('\n').trim();
+          if (!codeContent.contains(r'\documentclass') &&
+              !codeContent.contains(r'\begin{document}')) {
+            blocks.add(
+              _MdBlock(type: _BlockType.mathBlock, content: codeContent),
+            );
+            continue;
+          }
+        }
+
         blocks.add(
           _MdBlock(
             type: _BlockType.code,
             content: codeLines.join('\n'),
             language: lang,
           ),
+        );
+        continue;
+      }
+
+      if (trimmedLine.startsWith(r'$$')) {
+        if (trimmedLine.length >= 4 && trimmedLine.endsWith(r'$$')) {
+          final mathContent = trimmedLine
+              .substring(2, trimmedLine.length - 2)
+              .trim();
+          blocks.add(
+            _MdBlock(type: _BlockType.mathBlock, content: mathContent),
+          );
+          i++;
+          continue;
+        }
+
+        final mathLines = <String>[];
+        final firstLineRest = trimmedLine.substring(2).trim();
+        if (firstLineRest.isNotEmpty) {
+          mathLines.add(firstLineRest);
+        }
+        i++;
+        while (i < lines.length && !lines[i].trim().endsWith(r'$$')) {
+          mathLines.add(lines[i]);
+          i++;
+        }
+        if (i < lines.length) {
+          final endLine = lines[i].trim();
+          final beforeEnd = endLine.substring(0, endLine.length - 2).trim();
+          if (beforeEnd.isNotEmpty) {
+            mathLines.add(beforeEnd);
+          }
+          i++;
+        }
+        blocks.add(
+          _MdBlock(type: _BlockType.mathBlock, content: mathLines.join('\n').trim()),
+        );
+        continue;
+      }
+
+      if (trimmedLine.startsWith(r'\[')) {
+        if (trimmedLine.length >= 4 && trimmedLine.endsWith(r'\]')) {
+          final mathContent = trimmedLine
+              .substring(2, trimmedLine.length - 2)
+              .trim();
+          blocks.add(
+            _MdBlock(type: _BlockType.mathBlock, content: mathContent),
+          );
+          i++;
+          continue;
+        }
+
+        final mathLines = <String>[];
+        final firstLineRest = trimmedLine.substring(2).trim();
+        if (firstLineRest.isNotEmpty) {
+          mathLines.add(firstLineRest);
+        }
+        i++;
+        while (i < lines.length && !lines[i].trim().endsWith(r'\]')) {
+          mathLines.add(lines[i]);
+          i++;
+        }
+        blocks.add(
+          _MdBlock(type: _BlockType.mathBlock, content: mathLines.join('\n').trim()),
         );
         continue;
       }
@@ -129,6 +206,8 @@ class MarkdownRenderer extends StatelessWidget {
       while (i < lines.length &&
           lines[i].trim().isNotEmpty &&
           !lines[i].trim().startsWith('```') &&
+          !lines[i].trim().startsWith(r'$$') &&
+          !lines[i].trim().startsWith(r'\[') &&
           !lines[i].trim().startsWith('#') &&
           !lines[i].trim().startsWith('>') &&
           !lines[i].trim().startsWith('|') &&
@@ -154,6 +233,8 @@ class MarkdownRenderer extends StatelessWidget {
           language: block.language,
           code: block.content,
         );
+      case _BlockType.mathBlock:
+        return _renderMathBlock(context, block.content);
       case _BlockType.quote:
         return _renderQuote(context, block.content);
       case _BlockType.unorderedList:
@@ -174,7 +255,9 @@ class MarkdownRenderer extends StatelessWidget {
       case _BlockType.paragraph:
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
-          child: SelectableText.rich(_parseInlineSpans(context, block.content)),
+          child: SelectionArea(
+            child: Text.rich(_parseInlineSpans(context, block.content)),
+          ),
         );
     }
   }
@@ -199,13 +282,58 @@ class MarkdownRenderer extends StatelessWidget {
 
     return Padding(
       padding: EdgeInsets.only(top: level == 1 ? 14 : 10, bottom: 4),
-      child: SelectableText(
-        text,
-        style: TextStyle(
-          fontSize: size,
-          fontWeight: weight,
-          color: baseColor,
-          height: 1.3,
+      child: SelectionArea(
+        child: Text.rich(
+          _parseInlineSpans(
+            context,
+            text,
+            overrideStyle: TextStyle(
+              fontSize: size,
+              fontWeight: weight,
+              color: baseColor,
+              height: 1.3,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _renderMathBlock(BuildContext context, String tex) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final color = isDark ? AppTheme.textMain : AppTheme.lightTextMain;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: isDark
+            ? AppTheme.surfaceSubtle.withOpacity(0.6)
+            : AppTheme.lightSurfaceSubtle,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: theme.dividerColor.withOpacity(0.6)),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SelectionArea(
+          child: Math.tex(
+            tex.trim(),
+            mathStyle: MathStyle.display,
+            textStyle: TextStyle(
+              fontSize: 14.5,
+              color: color,
+            ),
+            onErrorFallback: (err) => Text(
+              '\$\$\n$tex\n\$\$',
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppTheme.accentPink,
+                fontFamily: 'monospace',
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -219,7 +347,9 @@ class MarkdownRenderer extends StatelessWidget {
       decoration: const BoxDecoration(
         border: Border(left: BorderSide(color: AppTheme.primary, width: 3)),
       ),
-      child: SelectableText.rich(_parseInlineSpans(context, quote)),
+      child: SelectionArea(
+        child: Text.rich(_parseInlineSpans(context, quote)),
+      ),
     );
   }
 
@@ -254,7 +384,9 @@ class MarkdownRenderer extends StatelessWidget {
                   ),
                 ),
                 Expanded(
-                  child: SelectableText.rich(_parseInlineSpans(context, item)),
+                  child: SelectionArea(
+                    child: Text.rich(_parseInlineSpans(context, item)),
+                  ),
                 ),
               ],
             ),
@@ -326,7 +458,50 @@ class MarkdownRenderer extends StatelessWidget {
     );
   }
 
-  TextSpan _parseInlineSpans(BuildContext context, String text) {
+  InlineSpan _buildMathSpan({
+    required BuildContext context,
+    required String expression,
+    required bool isDisplay,
+    TextStyle? textStyle,
+  }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final baseColor = isDark ? AppTheme.textMain : AppTheme.lightTextMain;
+    final effectiveStyle = (textStyle ??
+            TextStyle(
+              color: baseColor,
+              fontSize: 13.5,
+            ))
+        .copyWith(color: textStyle?.color ?? baseColor);
+
+    return WidgetSpan(
+      alignment: PlaceholderAlignment.middle,
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: isDisplay ? 4.0 : 1.5,
+          vertical: isDisplay ? 4.0 : 0.0,
+        ),
+        child: Math.tex(
+          expression.trim(),
+          mathStyle: isDisplay ? MathStyle.display : MathStyle.text,
+          textStyle: effectiveStyle,
+          onErrorFallback: (err) => Text(
+            isDisplay ? '\$\$$expression\$\$' : '\$$expression\$',
+            style: effectiveStyle.copyWith(
+              fontFamily: 'monospace',
+              color: AppTheme.accentPink,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  TextSpan _parseInlineSpans(
+    BuildContext context,
+    String text, {
+    TextStyle? overrideStyle,
+  }) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final defaultStyle = TextStyle(
@@ -334,13 +509,18 @@ class MarkdownRenderer extends StatelessWidget {
       fontSize: 13.5,
       height: 1.45,
     );
+    final effectiveStyle = overrideStyle ?? defaultStyle;
     final spans = <InlineSpan>[];
 
     final inlineRegex = RegExp(
-      r'(`([^`]+)`)' // code
-      r'|(\*\*([^*]+)\*\*)' // bold
-      r'|(\*([^*]+)\*)' // italic
-      r'|(~~([^~]+)~~)', // strike
+      r'(`([^`]+)`)' // 1, 2: code
+      r'|(\$\$([^\$]+?)\$\$)' // 3, 4: display math $$
+      r'|(\\\[([\s\S]+?)\\\])' // 5, 6: display math \[ \]
+      r'|(\\\(([\s\S]+?)\\\))' // 7, 8: inline math \( \)
+      r'|(\$([^\$\s](?:[^\$]*?[^\$\s])?)\$(?!\d))' // 9, 10: inline math $
+      r'|(\*\*([^*]+)\*\*)' // 11, 12: bold
+      r'|(\*([^*]+)\*)' // 13, 14: italic
+      r'|(~~([^~]+)~~)', // 15, 16: strike
     );
 
     var lastIdx = 0;
@@ -376,23 +556,64 @@ class MarkdownRenderer extends StatelessWidget {
         );
       } else if (match.group(4) != null) {
         spans.add(
-          TextSpan(
-            text: match.group(4)!,
-            style: const TextStyle(fontWeight: FontWeight.bold),
+          _buildMathSpan(
+            context: context,
+            expression: match.group(4)!,
+            isDisplay: true,
+            textStyle: effectiveStyle,
           ),
         );
       } else if (match.group(6) != null) {
         spans.add(
-          TextSpan(
-            text: match.group(6)!,
-            style: const TextStyle(fontStyle: FontStyle.italic),
+          _buildMathSpan(
+            context: context,
+            expression: match.group(6)!,
+            isDisplay: true,
+            textStyle: effectiveStyle,
           ),
         );
       } else if (match.group(8) != null) {
         spans.add(
-          TextSpan(
-            text: match.group(8)!,
-            style: const TextStyle(decoration: TextDecoration.lineThrough),
+          _buildMathSpan(
+            context: context,
+            expression: match.group(8)!,
+            isDisplay: false,
+            textStyle: effectiveStyle,
+          ),
+        );
+      } else if (match.group(10) != null) {
+        spans.add(
+          _buildMathSpan(
+            context: context,
+            expression: match.group(10)!,
+            isDisplay: false,
+            textStyle: effectiveStyle,
+          ),
+        );
+      } else if (match.group(12) != null) {
+        spans.add(
+          _parseInlineSpans(
+            context,
+            match.group(12)!,
+            overrideStyle: effectiveStyle.copyWith(fontWeight: FontWeight.bold),
+          ),
+        );
+      } else if (match.group(14) != null) {
+        spans.add(
+          _parseInlineSpans(
+            context,
+            match.group(14)!,
+            overrideStyle: effectiveStyle.copyWith(fontStyle: FontStyle.italic),
+          ),
+        );
+      } else if (match.group(16) != null) {
+        spans.add(
+          _parseInlineSpans(
+            context,
+            match.group(16)!,
+            overrideStyle: effectiveStyle.copyWith(
+              decoration: TextDecoration.lineThrough,
+            ),
           ),
         );
       }
@@ -403,7 +624,7 @@ class MarkdownRenderer extends StatelessWidget {
       spans.add(TextSpan(text: text.substring(lastIdx)));
     }
 
-    return TextSpan(style: defaultStyle, children: spans);
+    return TextSpan(style: effectiveStyle, children: spans);
   }
 }
 
@@ -416,6 +637,7 @@ enum _BlockType {
   orderedList,
   table,
   divider,
+  mathBlock,
 }
 
 class _MdBlock {

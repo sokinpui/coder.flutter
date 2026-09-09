@@ -35,6 +35,7 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: any
   flutter_highlight: any
+  flutter_math_fork: any
 
 dev_dependencies:
   flutter_test:

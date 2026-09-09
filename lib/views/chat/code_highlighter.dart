@@ -6,8 +6,6 @@ import 'package:highlight/highlight.dart' as hl;
 import '../../core/theme/app_theme.dart';
 
 class CodeHighlighter {
-  static List<String> get fontFallbacks => AppTheme.monoFontFamilyFallback;
-
   static String expandTabs(String code, {int tabSize = 4}) {
     final buffer = StringBuffer();
     final lines = code.replaceAll('\r\n', '\n').split('\n');

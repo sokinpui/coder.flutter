@@ -6,8 +6,4 @@ class Responsive {
   static bool isCompact(BuildContext context) {
     return MediaQuery.of(context).size.width < compactBreakpoint;
   }
-
-  static bool isExpanded(BuildContext context) {
-    return MediaQuery.of(context).size.width >= compactBreakpoint;
-  }
 }

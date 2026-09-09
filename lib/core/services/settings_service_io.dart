@@ -27,11 +27,11 @@ class IoSettingsService implements SettingsService {
         }
         return File('${dir.path}/settings.json');
       }
-      final fallbackDir = Directory('.coder');
+      final fallbackDir = Directory('.coder_flutter');
       if (!fallbackDir.existsSync()) {
         fallbackDir.createSync(recursive: true);
       }
-      return File('.coder/gui_settings.json');
+      return File('${fallbackDir.path}/settings.json');
     } catch (_) {
       return null;
     }

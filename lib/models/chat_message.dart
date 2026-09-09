@@ -3,7 +3,6 @@ import 'dart:typed_data';
 enum MessageAuthor {
   user,
   assistant,
-  system,
   image,
   command,
   commandResult,
@@ -19,8 +18,7 @@ class ChatMessage {
     this.imagePath,
     this.imageData,
     this.isGenerating = false,
-    DateTime? timestamp,
-  }) : timestamp = timestamp ?? DateTime.now();
+  });
 
   final String id;
   MessageAuthor author;
@@ -29,5 +27,4 @@ class ChatMessage {
   final String? imagePath;
   final Uint8List? imageData;
   bool isGenerating;
-  final DateTime timestamp;
 }

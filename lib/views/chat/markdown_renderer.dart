@@ -11,12 +11,10 @@ class MarkdownRenderer extends StatelessWidget {
     super.key,
     required this.content,
     this.searchPattern,
-    this.isStreaming = false,
   });
 
   final String content;
   final RegExp? searchPattern;
-  final bool isStreaming;
 
   @override
   Widget build(BuildContext context) {

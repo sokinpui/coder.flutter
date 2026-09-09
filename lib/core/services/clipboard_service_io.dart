@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io';
 import 'package:flutter/services.dart';
 
@@ -13,12 +12,6 @@ class IoClipboardService implements ClipboardService {
   static const MethodChannel _androidPickerChannel = MethodChannel(
     'coder_flutter/picker',
   );
-
-  final StreamController<Uint8List> _imageStreamController =
-      StreamController<Uint8List>.broadcast();
-
-  @override
-  Stream<Uint8List> get onImagePasted => _imageStreamController.stream;
 
   @override
   Future<Uint8List?> getClipboardImage() async {
@@ -49,9 +42,7 @@ class IoClipboardService implements ClipboardService {
     }
     if (Platform.isMacOS) {
       try {
-        return await _macClipboardChannel.invokeMethod<Uint8List>(
-          'pickImage',
-        );
+        return await _macClipboardChannel.invokeMethod<Uint8List>('pickImage');
       } catch (_) {
         return null;
       }

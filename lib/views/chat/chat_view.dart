@@ -1,15 +1,16 @@
-import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/services/clipboard_service.dart';
-import '../../core/utils/responsive.dart';
-import '../../core/widgets/hover_animated_button.dart';
 import '../../core/theme/app_theme.dart';
 import '../settings/context_dialog.dart';
 import '../../state/coder_state.dart';
+import 'empty_state.dart';
+import 'input_bar.dart';
 import 'message_bubble.dart';
+import 'search_bar.dart';
+import 'staged_images_preview.dart';
 
 class ChatView extends StatefulWidget {
   const ChatView({super.key, required this.state});
@@ -37,7 +38,6 @@ class _ChatViewState extends State<ChatView> {
   bool _isPicking = false;
   String? _searchError;
   final List<Uint8List> _stagedImages = [];
-  StreamSubscription<Uint8List>? _pastedImageSub;
 
   bool get _isMac =>
       defaultTargetPlatform == TargetPlatform.macOS ||
@@ -69,11 +69,6 @@ class _ChatViewState extends State<ChatView> {
   @override
   void initState() {
     super.initState();
-    _pastedImageSub = _clipboardService.onImagePasted.listen((bytes) {
-      if (!mounted) return;
-      setState(() => _stagedImages.add(bytes));
-      _maintainInputFocus();
-    });
     _searchController.addListener(_onSearchChanged);
   }
 
@@ -82,7 +77,6 @@ class _ChatViewState extends State<ChatView> {
     _promptController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
-    _pastedImageSub?.cancel();
     _scrollController.dispose();
     _inputFocusNode.dispose();
     super.dispose();
@@ -336,10 +330,52 @@ class _ChatViewState extends State<ChatView> {
                 ],
               ),
             ),
-          if (widget.state.isSearchVisible) _buildSearchBar(),
+          if (widget.state.isSearchVisible)
+            ChatSearchBar(
+              controller: _searchController,
+              focusNode: _searchFocusNode,
+              isRegex: _isRegex,
+              isCaseSensitive: _isCaseSensitive,
+              currentMatchIndex: _currentMatchIndex,
+              totalMatches: _matchedMessageIndices.length,
+              searchError: _searchError,
+              onToggleCaseSensitive: () {
+                setState(() => _isCaseSensitive = !_isCaseSensitive);
+                _onSearchChanged();
+              },
+              onToggleRegex: () {
+                setState(() => _isRegex = !_isRegex);
+                _onSearchChanged();
+              },
+              onPreviousMatch: _previousMatch,
+              onNextMatch: _nextMatch,
+              onClose: () {
+                widget.state.toggleSearch(false);
+                _maintainInputFocus();
+              },
+              onSubmitted: (_) => _nextMatch(),
+            ),
           Expanded(
             child: messages.isEmpty
-                ? _buildEmptyState()
+                ? ChatEmptyState(
+                    activeModel: widget.state.activeModel,
+                    onCodeAndChat: () {
+                      _promptController.text =
+                          'Explain the architecture of this project.';
+                      _maintainInputFocus();
+                    },
+                    onApplyItf: () {
+                      _promptController.text =
+                          'Write unified diffs for the necessary changes.';
+                      _maintainInputFocus();
+                    },
+                    onAttachImage: _handleAttachImage,
+                    onAddFileOrPdf: _handleAddFileOrPdf,
+                    onContextAndShell: () {
+                      _promptController.text = '/list';
+                      _maintainInputFocus();
+                    },
+                  )
                 : ListView.builder(
                     controller: _scrollController,
                     padding: const EdgeInsets.symmetric(
@@ -394,735 +430,50 @@ class _ChatViewState extends State<ChatView> {
                     },
                   ),
           ),
-          if (_stagedImages.isNotEmpty) _buildStagedImagePreview(),
-          _buildInputBar(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSearchBar() {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final hasMatches = _matchedMessageIndices.isNotEmpty;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.surfaceSubtle : AppTheme.lightSurfaceSubtle,
-        border: Border(bottom: BorderSide(color: theme.dividerColor)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.search, size: 18, color: AppTheme.textMuted),
-          const SizedBox(width: 8),
-          Expanded(
-            child: TextField(
-              controller: _searchController,
-              focusNode: _searchFocusNode,
-              style: const TextStyle(fontSize: 13),
-              decoration: InputDecoration(
-                hintText: 'Find in conversation (supports regex)...',
-                hintStyle: const TextStyle(
-                  fontSize: 13,
-                  color: AppTheme.textMuted,
-                ),
-                border: InputBorder.none,
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(vertical: 6),
-              ),
-              onSubmitted: (_) {
-                if (!hasMatches) return;
-                setState(() {
-                  _currentMatchIndex =
-                      (_currentMatchIndex + 1) % _matchedMessageIndices.length;
-                });
-                _scrollToMessage(_matchedMessageIndices[_currentMatchIndex]);
-              },
+          if (_stagedImages.isNotEmpty)
+            ChatStagedImagesPreview(
+              images: _stagedImages,
+              onRemoveImage: _removeStagedImage,
             ),
-          ),
-          HoverAnimatedButton(
-            tooltip: 'Match Case (Alt+C)',
-            hoverScale: 1.1,
-            onTap: () {
-              setState(() => _isCaseSensitive = !_isCaseSensitive);
-              _onSearchChanged();
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              decoration: BoxDecoration(
-                color: _isCaseSensitive
-                    ? AppTheme.primary.withOpacity(0.2)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                'Aa',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: _isCaseSensitive
-                      ? AppTheme.primary
-                      : AppTheme.textMuted,
-                ),
-              ),
+          ChatInputBar(
+            promptController: _promptController,
+            inputFocusNode: _inputFocusNode,
+            isGenerating: widget.state.isGenerating,
+            activeModel: widget.state.activeModel,
+            tokenCount: widget.state.tokenCount,
+            contextDocumentsCount: widget.state.contextDocuments.length,
+            contextFilesCount: widget.state.contextFiles.length,
+            isMac: _isMac,
+            onAttachImage: _handleAttachImage,
+            onAddFileOrPdf: _handleAddFileOrPdf,
+            onOpenContextDialog: () => showDialog(
+              context: context,
+              builder: (_) => ContextDialog(state: widget.state),
             ),
-          ),
-          const SizedBox(width: 4),
-          HoverAnimatedButton(
-            tooltip: 'Use Regular Expression (Alt+R)',
-            hoverScale: 1.1,
-            onTap: () {
-              setState(() => _isRegex = !_isRegex);
-              _onSearchChanged();
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              decoration: BoxDecoration(
-                color: _isRegex
-                    ? AppTheme.primary.withOpacity(0.2)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                '.*',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: _isRegex ? AppTheme.primary : AppTheme.textMuted,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            _searchError ??
-                (_searchController.text.isEmpty
-                    ? ''
-                    : (hasMatches
-                          ? '${_currentMatchIndex + 1} of ${_matchedMessageIndices.length}'
-                          : 'No results')),
-            style: TextStyle(
-              fontSize: 11.5,
-              color: _searchError != null
-                  ? AppTheme.accentPink
-                  : AppTheme.textMuted,
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.arrow_upward, size: 16),
-            tooltip: 'Previous match (Shift+Enter)',
-            onPressed: !hasMatches
-                ? null
-                : () {
-                    setState(() {
-                      _currentMatchIndex =
-                          (_currentMatchIndex -
-                              1 +
-                              _matchedMessageIndices.length) %
-                          _matchedMessageIndices.length;
-                    });
-                    _scrollToMessage(
-                      _matchedMessageIndices[_currentMatchIndex],
-                    );
-                  },
-          ),
-          IconButton(
-            icon: const Icon(Icons.arrow_downward, size: 16),
-            tooltip: 'Next match (Enter)',
-            onPressed: !hasMatches
-                ? null
-                : () {
-                    setState(() {
-                      _currentMatchIndex =
-                          (_currentMatchIndex + 1) %
-                          _matchedMessageIndices.length;
-                    });
-                    _scrollToMessage(
-                      _matchedMessageIndices[_currentMatchIndex],
-                    );
-                  },
-          ),
-          IconButton(
-            icon: const Icon(Icons.close, size: 16),
-            tooltip: 'Close (Esc)',
-            onPressed: () {
-              widget.state.toggleSearch(false);
-              _maintainInputFocus();
-            },
+            onCancelGeneration: widget.state.cancelGeneration,
+            onSubmit: _submit,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildEmptyState() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 820),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                'Explore Coder & Models',
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? AppTheme.textMain : AppTheme.lightTextMain,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Active Model: ${widget.state.activeModel}',
-                style: const TextStyle(color: AppTheme.textMuted, fontSize: 13),
-              ),
-              const SizedBox(height: 32),
-              Wrap(
-                spacing: 16,
-                runSpacing: 16,
-                alignment: WrapAlignment.center,
-                children: [
-                  _buildExploreCard(
-                    icon: Icons.code,
-                    title: 'Code and Chat',
-                    desc:
-                        'Build features, inspect repositories, and query methods.',
-                    onTap: () {
-                      _promptController.text =
-                          'Explain the architecture of this project.';
-                      _maintainInputFocus();
-                    },
-                  ),
-                  _buildExploreCard(
-                    icon: Icons.auto_fix_high,
-                    title: 'Apply ITF Changes',
-                    desc:
-                        'Parse markdown diff blocks and patch code directly to files.',
-                    onTap: () {
-                      _promptController.text =
-                          'Write unified diffs for the necessary changes.';
-                      _maintainInputFocus();
-                    },
-                  ),
-                  _buildExploreCard(
-                    icon: Icons.image_outlined,
-                    title: 'Image & UI Vision',
-                    desc:
-                        'Paste or attach screenshots for UI review and feedback.',
-                    onTap: _handleAttachImage,
-                  ),
-                  _buildExploreCard(
-                    icon: Icons.picture_as_pdf_outlined,
-                    title: 'PDF & Vision Docs',
-                    desc:
-                        'Add PDF documents to context for automatic page rendering with pti.',
-                    onTap: _handleAddFileOrPdf,
-                  ),
-                  _buildExploreCard(
-                    icon: Icons.terminal,
-                    title: 'Context & Shell',
-                    desc:
-                        'Add project files to context with /file and inspect with /list.',
-                    onTap: () {
-                      _promptController.text = '/list';
-                      _maintainInputFocus();
-                    },
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  void _previousMatch() {
+    if (_matchedMessageIndices.isEmpty) return;
+    setState(() {
+      _currentMatchIndex =
+          (_currentMatchIndex - 1 + _matchedMessageIndices.length) %
+          _matchedMessageIndices.length;
+    });
+    _scrollToMessage(_matchedMessageIndices[_currentMatchIndex]);
   }
 
-  Widget _buildExploreCard({
-    required IconData icon,
-    required String title,
-    required String desc,
-    required VoidCallback onTap,
-  }) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 380),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isDark ? AppTheme.surface : AppTheme.lightSurface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: theme.dividerColor),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppTheme.primary.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, color: AppTheme.primary, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                      color: isDark
-                          ? AppTheme.textMain
-                          : AppTheme.lightTextMain,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    desc,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.textMuted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStagedImagePreview() {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.surface : AppTheme.lightSurface,
-        border: Border(top: BorderSide(color: theme.dividerColor)),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            for (var i = 0; i < _stagedImages.length; i++)
-              Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: SizedBox(
-                  width: 64,
-                  height: 64,
-                  child: Stack(
-                    children: [
-                      Positioned(
-                        left: 0,
-                        bottom: 0,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: theme.dividerColor),
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(7),
-                            child: Image.memory(
-                              _stagedImages[i],
-                              width: 56,
-                              height: 56,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        top: 0,
-                        right: 0,
-                        child: _StagedImageDeleteButton(
-                          onDelete: () => _removeStagedImage(i),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInputBar() {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final isCompact = Responsive.isCompact(context);
-
-    final horizontalMargin = isCompact ? 10.0 : 16.0;
-    final bottomMargin = isCompact ? 8.0 : 16.0;
-
-    return SafeArea(
-      top: false,
-      child: Center(
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 840),
-        margin: EdgeInsets.fromLTRB(horizontalMargin, 6, horizontalMargin, bottomMargin),
-        padding: EdgeInsets.symmetric(horizontal: isCompact ? 10 : 12, vertical: isCompact ? 8 : 10),
-        decoration: BoxDecoration(
-          color: isDark ? AppTheme.surface : AppTheme.lightSurface,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: theme.dividerColor),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(isDark ? 0.25 : 0.06),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _promptController,
-              focusNode: _inputFocusNode,
-              maxLines: isCompact ? 5 : 8,
-              minLines: 1,
-              keyboardType: TextInputType.multiline,
-              textInputAction: TextInputAction.newline,
-              style: TextStyle(
-                fontSize: 14,
-                color: isDark ? AppTheme.textMain : AppTheme.lightTextMain,
-              ),
-              decoration: InputDecoration(
-                hintText: isCompact
-                    ? 'Message Coder...'
-                    : 'Start typing a prompt... (${_isMac ? 'Cmd+Enter' : 'Ctrl+Enter'} to send)',
-                hintStyle: const TextStyle(
-                  color: AppTheme.textMuted,
-                  fontSize: 13,
-                ),
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 6,
-                  vertical: 6,
-                ),
-                isDense: true,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    physics: const BouncingScrollPhysics(),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                IconButton(
-                  icon: const Icon(
-                    Icons.add_photo_alternate_outlined,
-                    size: 20,
-                  ),
-                  tooltip: 'Attach Image / Paste',
-                  onPressed: _handleAttachImage,
-                  constraints: const BoxConstraints(
-                    minWidth: 32,
-                    minHeight: 32,
-                  ),
-                  padding: EdgeInsets.zero,
-                ),
-                IconButton(
-                  icon: const Icon(Icons.attach_file_outlined, size: 20),
-                  tooltip: 'Add File / PDF to Context',
-                  onPressed: _handleAddFileOrPdf,
-                  constraints: const BoxConstraints(
-                    minWidth: 32,
-                    minHeight: 32,
-                  ),
-                  padding: EdgeInsets.zero,
-                ),
-                const SizedBox(width: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? AppTheme.surfaceSubtle
-                        : AppTheme.lightSurfaceSubtle,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.memory,
-                        size: 12,
-                        color: AppTheme.primary,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        widget.state.activeModel,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppTheme.textMuted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (widget.state.tokenCount > 0) ...[
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? AppTheme.surfaceSubtle
-                          : AppTheme.lightSurfaceSubtle,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.toll_outlined,
-                          size: 12,
-                          color: Colors.greenAccent,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '≈${widget.state.tokenCount}',
-                          style: AppTheme.monoTextStyle(
-                            fontSize: 11,
-                            color: AppTheme.textMuted,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-                if (widget.state.contextDocuments.isNotEmpty) ...[
-                  const SizedBox(width: 6),
-                  InkWell(
-                    onTap: () => showDialog(
-                      context: context,
-                      builder: (_) => ContextDialog(state: widget.state),
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? AppTheme.surfaceSubtle
-                            : AppTheme.lightSurfaceSubtle,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.picture_as_pdf_outlined,
-                            size: 12,
-                            color: AppTheme.accentYellow,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${widget.state.contextDocuments.length} doc${widget.state.contextDocuments.length == 1 ? '' : 's'}',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: AppTheme.textMuted,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-                if (widget.state.contextFiles.isNotEmpty) ...[
-                  const SizedBox(width: 6),
-                  InkWell(
-                    onTap: () => showDialog(
-                      context: context,
-                      builder: (_) => ContextDialog(state: widget.state),
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? AppTheme.surfaceSubtle
-                            : AppTheme.lightSurfaceSubtle,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.folder_outlined,
-                            size: 12,
-                            color: AppTheme.accentCyan,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${widget.state.contextFiles.length} file${widget.state.contextFiles.length == 1 ? '' : 's'}',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: AppTheme.textMuted,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                if (widget.state.isGenerating)
-                  HoverAnimatedButton(
-                    tooltip: 'Cancel (Esc)',
-                    hoverScale: 1.10,
-                    onTap: widget.state.cancelGeneration,
-                    child: Container(
-                      width: 34,
-                      height: 34,
-                      decoration: const BoxDecoration(
-                        color: AppTheme.accentPink,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.stop,
-                        size: 18,
-                        color: Colors.white,
-                      ),
-                    ),
-                  )
-                else
-                  HoverAnimatedButton(
-                    tooltip: 'Send (${_isMac ? 'Cmd+Enter' : 'Ctrl+Enter'})',
-                    hoverScale: 1.12,
-                    onTap: _submit,
-                    child: Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: AppTheme.primary,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppTheme.primary.withOpacity(0.35),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.arrow_upward,
-                        size: 18,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
-      ),
-    );
-  }
-}
-
-class _StagedImageDeleteButton extends StatefulWidget {
-  const _StagedImageDeleteButton({required this.onDelete});
-
-  final VoidCallback onDelete;
-
-  @override
-  State<_StagedImageDeleteButton> createState() =>
-      _StagedImageDeleteButtonState();
-}
-
-class _StagedImageDeleteButtonState extends State<_StagedImageDeleteButton> {
-  bool _isHovered = false;
-  bool _isPressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    const activeColor = Color(0xFFFF453A);
-    final buttonColor = _isHovered ? activeColor : AppTheme.accentPink;
-
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() {
-        _isHovered = false;
-        _isPressed = false;
-      }),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapDown: (_) => setState(() => _isPressed = true),
-        onTapUp: (_) => setState(() => _isPressed = false),
-        onTapCancel: () => setState(() => _isPressed = false),
-        onTap: widget.onDelete,
-        child: Tooltip(
-          message: 'Remove image',
-          waitDuration: const Duration(milliseconds: 400),
-          child: AnimatedScale(
-            scale: _isPressed ? 0.88 : (_isHovered ? 1.18 : 1.0),
-            duration: const Duration(milliseconds: 140),
-            curve: Curves.easeOutCubic,
-            child: AnimatedRotation(
-              turns: _isHovered ? 0.25 : 0.0,
-              duration: const Duration(milliseconds: 180),
-              curve: Curves.easeOutCubic,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 140),
-                width: 22,
-                height: 22,
-                decoration: BoxDecoration(
-                  color: buttonColor,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: buttonColor.withOpacity(_isHovered ? 0.5 : 0.28),
-                      blurRadius: _isHovered ? 6 : 3,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                child: const Center(
-                  child: Icon(Icons.close, size: 13, color: Colors.white),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+  void _nextMatch() {
+    if (_matchedMessageIndices.isEmpty) return;
+    setState(() {
+      _currentMatchIndex =
+          (_currentMatchIndex + 1) % _matchedMessageIndices.length;
+    });
+    _scrollToMessage(_matchedMessageIndices[_currentMatchIndex]);
   }
 }

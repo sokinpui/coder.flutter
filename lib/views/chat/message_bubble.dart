@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/responsive.dart';
-import '../../core/widgets/hover_animated_button.dart';
 import '../../models/chat_message.dart';
-import 'markdown_renderer.dart';
 import 'generating_indicator.dart';
+import 'markdown_renderer.dart';
+import 'message_action_bar.dart';
+import 'reasoning_card.dart';
 
 class MessageBubble extends StatefulWidget {
   const MessageBubble({
@@ -142,7 +142,7 @@ class _MessageBubbleState extends State<MessageBubble> {
                 children: [
                   if (isImageMsg) _buildImagePayload(maxBubbleWidth),
                   if (widget.message.reasoning.isNotEmpty)
-                    _ReasoningCard(
+                    ReasoningCard(
                       reasoning: widget.message.reasoning,
                       isDark: isDark,
                     ),
@@ -152,7 +152,6 @@ class _MessageBubbleState extends State<MessageBubble> {
                     MarkdownRenderer(
                       content: widget.message.content,
                       searchPattern: widget.searchPattern,
-                      isStreaming: widget.message.isGenerating,
                     ),
                   if (widget.message.isGenerating)
                     const Padding(
@@ -160,7 +159,24 @@ class _MessageBubbleState extends State<MessageBubble> {
                       child: GeneratingIndicator(),
                     ),
                   if (!widget.message.isGenerating && !_isEditing)
-                    _buildActionBar(context, isUserSide),
+                    MessageActionBar(
+                      message: widget.message,
+                      isUser: isUserSide,
+                      onEdit: widget.onEdit == null
+                          ? null
+                          : () {
+                              _editController.text = widget.message.content;
+                              setState(() => _isEditing = true);
+                              WidgetsBinding.instance.addPostFrameCallback(
+                                (_) => _editFocusNode.requestFocus(),
+                              );
+                            },
+                      onApplyItf: widget.onApplyItf,
+                      onUndoItf: widget.onUndoItf,
+                      onBranch: widget.onBranch,
+                      onRegenerate: widget.onRegenerate,
+                      onDelete: widget.onDelete,
+                    ),
                 ],
               ),
             ),
@@ -248,146 +264,6 @@ class _MessageBubbleState extends State<MessageBubble> {
     );
   }
 
-  Widget _buildActionBar(BuildContext context, bool isUser) {
-    final msg = widget.message;
-    final isCommand =
-        msg.author == MessageAuthor.command ||
-        msg.author == MessageAuthor.commandResult ||
-        msg.author == MessageAuthor.commandError;
-    final hasDiff =
-        msg.content.contains('```diff') ||
-        msg.content.contains('```rename') ||
-        msg.content.contains('```delete');
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 4),
-      child: Wrap(
-        spacing: 2,
-        runSpacing: 2,
-        children: [
-          if (msg.author == MessageAuthor.user && widget.onEdit != null)
-            HoverAnimatedButton(
-              tooltip: 'Edit Message',
-              hoverScale: 1.15,
-              onTap: () {
-                _editController.text = msg.content;
-                setState(() => _isEditing = true);
-                WidgetsBinding.instance.addPostFrameCallback(
-                  (_) => _editFocusNode.requestFocus(),
-                );
-              },
-              child: const Padding(
-                padding: EdgeInsets.all(6),
-                child: Icon(
-                  Icons.edit_outlined,
-                  size: 15,
-                  color: AppTheme.textMuted,
-                ),
-              ),
-            ),
-          if (!isUser && hasDiff && widget.onApplyItf != null)
-            IconButton(
-              icon: const Icon(
-                Icons.auto_fix_high,
-                size: 15,
-                color: AppTheme.accentCyan,
-              ),
-              tooltip: 'Apply Changes (ITF)',
-              onPressed: () => widget.onApplyItf!(msg.content),
-              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-              padding: EdgeInsets.zero,
-            ),
-          if (!isUser && widget.onUndoItf != null)
-            IconButton(
-              icon: const Icon(Icons.undo, size: 15, color: AppTheme.textMuted),
-              tooltip: 'Undo Last Applied Changes',
-              onPressed: widget.onUndoItf,
-              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-              padding: EdgeInsets.zero,
-            ),
-          if (widget.onBranch != null)
-            IconButton(
-              icon: const Icon(
-                Icons.fork_right_outlined,
-                size: 15,
-                color: AppTheme.textMuted,
-              ),
-              tooltip: 'Branch Conversation Here',
-              onPressed: widget.onBranch,
-              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-              padding: EdgeInsets.zero,
-            ),
-          if (widget.onRegenerate != null && !isCommand)
-            IconButton(
-              icon: const Icon(
-                Icons.refresh,
-                size: 15,
-                color: AppTheme.textMuted,
-              ),
-              tooltip: 'Regenerate Turn',
-              onPressed: widget.onRegenerate,
-              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-              padding: EdgeInsets.zero,
-            ),
-          IconButton(
-            icon: const Icon(Icons.copy, size: 14, color: AppTheme.textMuted),
-            tooltip: 'Copy Message',
-            onPressed: () {
-              final textToCopy = msg.imageData != null
-                  ? '[Image]'
-                  : msg.content;
-              Clipboard.setData(ClipboardData(text: textToCopy));
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Copied to clipboard'),
-                  duration: Duration(seconds: 1),
-                ),
-              );
-            },
-            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-            padding: EdgeInsets.zero,
-          ),
-          if (widget.onDelete != null)
-            IconButton(
-              icon: const Icon(
-                Icons.delete_outline,
-                size: 15,
-                color: AppTheme.textMuted,
-              ),
-              tooltip: 'Delete Message',
-              onPressed: () => _confirmDelete(context),
-              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-              padding: EdgeInsets.zero,
-            ),
-        ],
-      ),
-    );
-  }
-
-  void _confirmDelete(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete Message?', style: TextStyle(fontSize: 16)),
-        content: const Text('Are you sure you want to remove this message?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppTheme.accentPink),
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              widget.onDelete?.call();
-            },
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildImagePayload(double maxWidth) {
     if (widget.message.imageData != null) {
       return ClipRRect(
@@ -434,9 +310,6 @@ class _MessageBubbleState extends State<MessageBubble> {
       case MessageAuthor.commandError:
         icon = Icons.error_outline;
         color = AppTheme.accentPink;
-      case MessageAuthor.system:
-        icon = Icons.info_outline;
-        color = AppTheme.textMuted;
       case MessageAuthor.user:
         icon = Icons.person;
         color = AppTheme.primary;
@@ -449,93 +322,6 @@ class _MessageBubbleState extends State<MessageBubble> {
       radius: 14,
       backgroundColor: color.withOpacity(0.2),
       child: Icon(icon, size: 16, color: color),
-    );
-  }
-}
-
-class _ReasoningCard extends StatefulWidget {
-  const _ReasoningCard({required this.reasoning, required this.isDark});
-
-  final String reasoning;
-  final bool isDark;
-
-  @override
-  State<_ReasoningCard> createState() => _ReasoningCardState();
-}
-
-class _ReasoningCardState extends State<_ReasoningCard> {
-  bool _isExpanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final bgColor = widget.isDark
-        ? AppTheme.background.withOpacity(0.7)
-        : AppTheme.lightSurfaceSubtle.withOpacity(0.7);
-    final borderColor = (widget.isDark ? AppTheme.border : AppTheme.lightBorder)
-        .withOpacity(0.6);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: borderColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          InkWell(
-            onTap: () => setState(() => _isExpanded = !_isExpanded),
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.psychology_outlined,
-                    color: AppTheme.accentYellow,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 6),
-                  const Text(
-                    'Thought Process',
-                    style: TextStyle(
-                      color: AppTheme.accentYellow,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  AnimatedRotation(
-                    turns: _isExpanded ? 0.5 : 0.0,
-                    duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeOutCubic,
-                    child: const Icon(
-                      Icons.keyboard_arrow_down,
-                      size: 16,
-                      color: AppTheme.accentYellow,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (_isExpanded)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 2, 10, 8),
-              child: SelectableText(
-                widget.reasoning,
-                style: AppTheme.monoTextStyle(
-                  color: AppTheme.textMuted,
-                  fontSize: 12,
-                  height: 1.4,
-                ),
-              ),
-            ),
-        ],
-      ),
     );
   }
 }

@@ -30,7 +30,6 @@ class SessionSidebar extends StatelessWidget {
         children: [
           _buildHeader(context),
           _buildNewChatButton(context),
-          _buildModelSelector(context),
           const Divider(),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -129,70 +128,6 @@ class SessionSidebar extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildModelSelector(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final textColor = isDark ? AppTheme.textMain : AppTheme.lightTextMain;
-
-    if (state.availableModels.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        child: Text(
-          'Model: ${state.activeModel}',
-          style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
-        ),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: DropdownButtonFormField<String>(
-        isExpanded: true,
-        initialValue: state.availableModels.contains(state.activeModel)
-            ? state.activeModel
-            : null,
-        isDense: true,
-        decoration: InputDecoration(
-          labelText: 'Active Model',
-          labelStyle: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: theme.dividerColor),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: theme.dividerColor),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: AppTheme.primary),
-          ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 10,
-            vertical: 8,
-          ),
-        ),
-        dropdownColor: isDark ? AppTheme.surfaceSubtle : AppTheme.lightSurface,
-        style: TextStyle(color: textColor, fontSize: 12),
-        items: state.availableModels.map((m) {
-          return DropdownMenuItem(
-            value: m,
-            child: Text(
-              m,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: textColor, fontSize: 12),
-            ),
-          );
-        }).toList(),
-        onChanged: (model) {
-          if (model != null) {
-            state.setModel(model);
-          }
-        },
       ),
     );
   }

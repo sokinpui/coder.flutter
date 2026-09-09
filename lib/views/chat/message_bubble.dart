@@ -115,38 +115,35 @@ class _MessageBubbleState extends State<MessageBubble> {
                     ),
                 ],
               ),
-              child: IntrinsicWidth(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (isImageMsg) _buildImagePayload(),
-                    if (widget.message.reasoning.isNotEmpty)
-                      _buildReasoningBlock(),
-                    if (_isEditing)
-                      _buildInlineEditor(context, isDark)
-                    else if (!isImageMsg &&
-                        widget.message.content.isNotEmpty) ...[
-                      MarkdownRenderer(
-                        content: widget.message.content,
-                        searchPattern: widget.searchPattern,
-                        isStreaming: widget.message.isGenerating,
-                      ),
-                      if (widget.message.isGenerating)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 6),
-                          child: GeneratingIndicator(),
-                        ),
-                    ],
-                    if (!widget.message.isGenerating && !_isEditing)
-                      Align(
-                        alignment: isUserSide
-                            ? Alignment.centerRight
-                            : Alignment.centerLeft,
-                        child: _buildActionBar(context, isUserSide),
-                      ),
-                  ],
-                ),
+              child: Column(
+                crossAxisAlignment: isUserSide
+                    ? CrossAxisAlignment.end
+                    : CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isImageMsg) _buildImagePayload(),
+                  if (widget.message.reasoning.isNotEmpty)
+                    _ReasoningCard(
+                      reasoning: widget.message.reasoning,
+                      isDark: isDark,
+                    ),
+                  if (_isEditing)
+                    _buildInlineEditor(context, isDark)
+                  else if (!isImageMsg &&
+                      widget.message.content.isNotEmpty)
+                    MarkdownRenderer(
+                      content: widget.message.content,
+                      searchPattern: widget.searchPattern,
+                      isStreaming: widget.message.isGenerating,
+                    ),
+                  if (widget.message.isGenerating)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 6),
+                      child: GeneratingIndicator(),
+                    ),
+                  if (!widget.message.isGenerating && !_isEditing)
+                    _buildActionBar(context, isUserSide),
+                ],
               ),
             ),
           ),
@@ -405,49 +402,85 @@ class _MessageBubbleState extends State<MessageBubble> {
       child: Icon(icon, size: 16, color: color),
     );
   }
+}
 
-  Widget _buildReasoningBlock() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Theme(
-        data: ThemeData(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          collapsedShape: RoundedRectangleBorder(
+class _ReasoningCard extends StatefulWidget {
+  const _ReasoningCard({
+    required this.reasoning,
+    required this.isDark,
+  });
+
+  final String reasoning;
+  final bool isDark;
+
+  @override
+  State<_ReasoningCard> createState() => _ReasoningCardState();
+}
+
+class _ReasoningCardState extends State<_ReasoningCard> {
+  bool _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final bgColor = widget.isDark
+        ? AppTheme.background.withOpacity(0.7)
+        : AppTheme.lightSurfaceSubtle.withOpacity(0.7);
+    final borderColor = (widget.isDark ? AppTheme.border : AppTheme.lightBorder)
+        .withOpacity(0.6);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          InkWell(
+            onTap: () => setState(() => _isExpanded = !_isExpanded),
             borderRadius: BorderRadius.circular(8),
-          ),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          backgroundColor: isDark
-              ? AppTheme.background
-              : AppTheme.lightSurfaceSubtle,
-          collapsedBackgroundColor: isDark
-              ? AppTheme.background.withOpacity(0.7)
-              : AppTheme.lightSurfaceSubtle.withOpacity(0.7),
-          tilePadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-          title: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.psychology_outlined,
-                color: AppTheme.accentYellow,
-                size: 16,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.psychology_outlined,
+                    color: AppTheme.accentYellow,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 6),
+                  const Text(
+                    'Thought Process',
+                    style: TextStyle(
+                      color: AppTheme.accentYellow,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  AnimatedRotation(
+                    turns: _isExpanded ? 0.5 : 0.0,
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    child: const Icon(
+                      Icons.keyboard_arrow_down,
+                      size: 16,
+                      color: AppTheme.accentYellow,
+                    ),
+                  ),
+                ],
               ),
-              SizedBox(width: 6),
-              Text(
-                'Thought Process',
-                style: TextStyle(
-                  color: AppTheme.accentYellow,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+            ),
           ),
-          children: [
+          if (_isExpanded)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.fromLTRB(10, 2, 10, 8),
               child: SelectableText(
-                widget.message.reasoning,
+                widget.reasoning,
                 style: AppTheme.monoTextStyle(
                   color: AppTheme.textMuted,
                   fontSize: 12,
@@ -455,8 +488,7 @@ class _MessageBubbleState extends State<MessageBubble> {
                 ),
               ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }

@@ -137,13 +137,14 @@ class MarkdownRenderer extends StatelessWidget {
 class LatexSyntax extends m.InlineSyntax {
   LatexSyntax()
     : super(
-        r'(\$\$[\s\S]+?\$\$)|(\$.+?\$)|(\\\[[\s\S]+?\\\])|(\\\([\s\S]+?\\\))',
+        r'(\$\$[\s\S]+?\$\$)|(\\\[[\s\S]+?\\\])|(\\\([\s\S]+?\\\))|((?<!\\)\$([^\$\s\n](?:[^\$\n]*?[^\$\s\n])?)\$)',
       );
 
   @override
   bool onMatch(m.InlineParser parser, Match match) {
-    final input = match.input;
-    final matchValue = input.substring(match.start, match.end);
+    final matchValue = match.group(0) ?? '';
+    if (matchValue.isEmpty) return false;
+
     String content = '';
     bool isInline = true;
 
@@ -167,6 +168,10 @@ class LatexSyntax extends m.InlineSyntax {
         matchValue.length >= 2) {
       content = matchValue.substring(1, matchValue.length - 1).trim();
       isInline = true;
+    }
+
+    if (content.isEmpty) {
+      return false;
     }
 
     final el = m.Element.text('latex', matchValue);
@@ -198,19 +203,26 @@ class LatexNode extends SpanNode {
       return TextSpan(style: style, text: textContent);
     }
 
-    final latex = Math.tex(
-      content,
-      mathStyle: isInline ? MathStyle.text : MathStyle.display,
-      textStyle: TextStyle(fontSize: isInline ? 13.5 : 14.5, color: baseColor),
-      onErrorFallback: (err) => Text(
-        isInline ? '\$$content\$' : '\$\$\n$content\n\$\$',
-        style: style.copyWith(
-          fontFamily: AppTheme.monoFontFamily,
-          fontFamilyFallback: AppTheme.monoFontFamilyFallback,
-          color: AppTheme.accentPink,
+    Widget latex;
+    try {
+      latex = Math.tex(
+        content,
+        mathStyle: isInline ? MathStyle.text : MathStyle.display,
+        textStyle: TextStyle(
+          fontSize: isInline ? 13.5 : 14.5,
+          color: baseColor,
         ),
-      ),
-    );
+        onErrorFallback: (_) => Text(
+          isInline ? '\$$content\$' : '\$\$\n$content\n\$\$',
+          style: style,
+        ),
+      );
+    } catch (_) {
+      latex = Text(
+        isInline ? '\$$content\$' : '\$\$\n$content\n\$\$',
+        style: style,
+      );
+    }
 
     if (isInline) {
       return WidgetSpan(

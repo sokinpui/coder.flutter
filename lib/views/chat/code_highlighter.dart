@@ -46,6 +46,18 @@ class CodeHighlighter {
     final TextSpan baseSpan;
     if (_isDiffLanguage(normalizedLang)) {
       baseSpan = _highlightDiff(code, isDark, fontSize: fontSize);
+    } else if (_isPlainLanguage(normalizedLang)) {
+      final fallbackColor = isDark
+          ? const Color(0xFFE6EDF3)
+          : const Color(0xFF24292F);
+      baseSpan = TextSpan(
+        text: code,
+        style: AppTheme.monoTextStyle(
+          fontSize: fontSize,
+          height: 1.5,
+          color: fallbackColor,
+        ),
+      );
     } else {
       final theme = isDark ? atomOneDarkTheme : githubTheme;
       final fallbackColor = isDark
@@ -76,6 +88,15 @@ class CodeHighlighter {
         lang == 'delete';
   }
 
+  static bool _isPlainLanguage(String lang) {
+    return lang.isEmpty ||
+        lang == 'text' ||
+        lang == 'plaintext' ||
+        lang == 'plain' ||
+        lang == 'txt' ||
+        lang == 'none';
+  }
+
   static List<TextSpan> _parseHighlight(
     String code,
     String lang,
@@ -84,8 +105,8 @@ class CodeHighlighter {
     try {
       final result = hl.highlight.parse(
         code,
-        language: lang.isEmpty ? null : lang,
-        autoDetection: lang.isEmpty,
+        language: lang,
+        autoDetection: false,
       );
       final nodes = result.nodes;
       if (nodes == null || nodes.isEmpty) {

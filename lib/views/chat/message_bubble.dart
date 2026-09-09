@@ -86,7 +86,10 @@ class _MessageBubbleState extends State<MessageBubble> {
           const SizedBox(width: 10),
           Flexible(
             child: Container(
-              constraints: const BoxConstraints(maxWidth: 800),
+              constraints: BoxConstraints(
+                maxWidth: 800,
+                minWidth: _isEditing ? 320 : 0,
+              ),
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: isUserSide
@@ -112,30 +115,38 @@ class _MessageBubbleState extends State<MessageBubble> {
                     ),
                 ],
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (isImageMsg) _buildImagePayload(),
-                  if (widget.message.reasoning.isNotEmpty)
-                    _buildReasoningBlock(),
-                  if (_isEditing)
-                    _buildInlineEditor(context, isDark)
-                  else if (!isImageMsg &&
-                      widget.message.content.isNotEmpty) ...[
-                    MarkdownRenderer(
-                      content: widget.message.content,
-                      searchPattern: widget.searchPattern,
-                      isStreaming: widget.message.isGenerating,
-                    ),
-                    if (widget.message.isGenerating)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 6),
-                        child: GeneratingIndicator(),
+              child: IntrinsicWidth(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isImageMsg) _buildImagePayload(),
+                    if (widget.message.reasoning.isNotEmpty)
+                      _buildReasoningBlock(),
+                    if (_isEditing)
+                      _buildInlineEditor(context, isDark)
+                    else if (!isImageMsg &&
+                        widget.message.content.isNotEmpty) ...[
+                      MarkdownRenderer(
+                        content: widget.message.content,
+                        searchPattern: widget.searchPattern,
+                        isStreaming: widget.message.isGenerating,
+                      ),
+                      if (widget.message.isGenerating)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 6),
+                          child: GeneratingIndicator(),
+                        ),
+                    ],
+                    if (!widget.message.isGenerating && !_isEditing)
+                      Align(
+                        alignment: isUserSide
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
+                        child: _buildActionBar(context, isUserSide),
                       ),
                   ],
-                  if (!widget.message.isGenerating && !_isEditing)
-                    _buildActionBar(context, isUserSide),
-                ],
+                ),
               ),
             ),
           ),
@@ -228,9 +239,9 @@ class _MessageBubbleState extends State<MessageBubble> {
         msg.content.contains('```delete');
 
     return Padding(
-      padding: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.only(top: 6),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
         children: [
           if (isUser && widget.onEdit != null)
             HoverAnimatedButton(
@@ -414,6 +425,7 @@ class _MessageBubbleState extends State<MessageBubble> {
               : AppTheme.lightSurfaceSubtle.withOpacity(0.7),
           tilePadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
           title: const Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 Icons.psychology_outlined,

@@ -201,6 +201,14 @@ class _ChatViewState extends State<ChatView> {
     _maintainInputFocus();
   }
 
+  void _removeStagedImage(int index) {
+    if (index < 0 || index >= _stagedImages.length) {
+      return;
+    }
+    setState(() => _stagedImages.removeAt(index));
+    _maintainInputFocus();
+  }
+
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) {
       return KeyEventResult.ignored;
@@ -232,6 +240,16 @@ class _ChatViewState extends State<ChatView> {
     if (event.logicalKey == LogicalKeyboardKey.keyV && isModifierActive) {
       _pasteClipboardImage();
       _maintainInputFocus();
+    }
+
+    final isBackspaceOrDelete =
+        event.logicalKey == LogicalKeyboardKey.backspace ||
+        event.logicalKey == LogicalKeyboardKey.delete;
+    if (isBackspaceOrDelete &&
+        _promptController.text.isEmpty &&
+        _stagedImages.isNotEmpty) {
+      _removeStagedImage(_stagedImages.length - 1);
+      return KeyEventResult.handled;
     }
 
     final isEnter =
@@ -651,38 +669,39 @@ class _ChatViewState extends State<ChatView> {
             for (var i = 0; i < _stagedImages.length; i++)
               Padding(
                 padding: const EdgeInsets.only(right: 12),
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.memory(
-                        _stagedImages[i],
-                        width: 56,
-                        height: 56,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    Positioned(
-                      top: -6,
-                      right: -6,
-                      child: GestureDetector(
-                        onTap: () => setState(() => _stagedImages.removeAt(i)),
+                child: SizedBox(
+                  width: 64,
+                  height: 64,
+                  child: Stack(
+                    children: [
+                      Positioned(
+                        left: 0,
+                        bottom: 0,
                         child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: const BoxDecoration(
-                            color: AppTheme.accentPink,
-                            shape: BoxShape.circle,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: theme.dividerColor),
                           ),
-                          child: const Icon(
-                            Icons.close,
-                            size: 12,
-                            color: Colors.white,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(7),
+                            child: Image.memory(
+                              _stagedImages[i],
+                              width: 56,
+                              height: 56,
+                              fit: BoxFit.cover,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                      Positioned(
+                        top: 0,
+                        right: 0,
+                        child: _StagedImageDeleteButton(
+                          onDelete: () => _removeStagedImage(i),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
           ],
@@ -868,6 +887,76 @@ class _ChatViewState extends State<ChatView> {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StagedImageDeleteButton extends StatefulWidget {
+  const _StagedImageDeleteButton({required this.onDelete});
+
+  final VoidCallback onDelete;
+
+  @override
+  State<_StagedImageDeleteButton> createState() =>
+      _StagedImageDeleteButtonState();
+}
+
+class _StagedImageDeleteButtonState extends State<_StagedImageDeleteButton> {
+  bool _isHovered = false;
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    const activeColor = Color(0xFFFF453A);
+    final buttonColor = _isHovered ? activeColor : AppTheme.accentPink;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() {
+        _isHovered = false;
+        _isPressed = false;
+      }),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => setState(() => _isPressed = true),
+        onTapUp: (_) => setState(() => _isPressed = false),
+        onTapCancel: () => setState(() => _isPressed = false),
+        onTap: widget.onDelete,
+        child: Tooltip(
+          message: 'Remove image',
+          waitDuration: const Duration(milliseconds: 400),
+          child: AnimatedScale(
+            scale: _isPressed ? 0.88 : (_isHovered ? 1.18 : 1.0),
+            duration: const Duration(milliseconds: 140),
+            curve: Curves.easeOutCubic,
+            child: AnimatedRotation(
+              turns: _isHovered ? 0.25 : 0.0,
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 140),
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: buttonColor,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: buttonColor.withOpacity(_isHovered ? 0.5 : 0.28),
+                      blurRadius: _isHovered ? 6 : 3,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: const Center(
+                  child: Icon(Icons.close, size: 13, color: Colors.white),
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );

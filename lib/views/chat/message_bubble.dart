@@ -99,8 +99,8 @@ class _MessageBubbleState extends State<MessageBubble> {
                   color: widget.isSearchMatch
                       ? AppTheme.accentYellow
                       : (isUserSide
-                          ? theme.dividerColor.withOpacity(0.4)
-                          : theme.dividerColor),
+                            ? theme.dividerColor.withOpacity(0.4)
+                            : theme.dividerColor),
                   width: widget.isSearchMatch ? 1.8 : 1.0,
                 ),
                 boxShadow: [
@@ -406,7 +406,9 @@ class _MessageBubbleState extends State<MessageBubble> {
             borderRadius: BorderRadius.circular(8),
           ),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          backgroundColor: isDark ? AppTheme.background : AppTheme.lightSurfaceSubtle,
+          backgroundColor: isDark
+              ? AppTheme.background
+              : AppTheme.lightSurfaceSubtle,
           collapsedBackgroundColor: isDark
               ? AppTheme.background.withOpacity(0.7)
               : AppTheme.lightSurfaceSubtle.withOpacity(0.7),

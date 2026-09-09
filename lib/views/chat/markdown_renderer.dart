@@ -33,96 +33,96 @@ class MarkdownRenderer extends StatelessWidget {
               LatexNode(e.attributes, e.textContent, config, isDark),
         ),
       ],
-      textGenerator: (node, config, visitor) => CustomSearchTextNode(
-        node.textContent,
-        searchPattern,
-        isDark,
-      ),
+      textGenerator: (node, config, visitor) =>
+          CustomSearchTextNode(node.textContent, searchPattern, isDark),
     );
 
-    final markdownConfig = (isDark
-            ? MarkdownConfig.darkConfig
-            : MarkdownConfig.defaultConfig)
-        .copy(
-      configs: [
-        CodeConfig(
-          style: AppTheme.monoTextStyle(
-            fontSize: 13.0,
-            color: isDark ? const Color(0xFFFF7B72) : const Color(0xFFCF222E),
-            backgroundColor: isDark
-                ? const Color(0x266E7681)
-                : const Color(0x1A1F2328),
-          ),
-        ),
-        PConfig(
-          textStyle: TextStyle(
-            fontSize: 13.5,
-            height: 1.45,
-            color: baseColor,
-          ),
-        ),
-        H1Config(
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: baseColor,
-          ),
-        ),
-        H2Config(
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: baseColor,
-          ),
-        ),
-        H3Config(
-          style: TextStyle(
-            fontSize: 14.5,
-            fontWeight: FontWeight.w600,
-            color: baseColor,
-          ),
-        ),
-        H4Config(
-          style: TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w600,
-            color: baseColor,
-          ),
-        ),
-        PreConfig(
-          wrapper: (child, code, language) => CollapsibleCodeBlock(
-            language: language,
-            code: code,
-            searchPattern: searchPattern,
-          ),
-        ),
-        ListConfig(
-          marginLeft: 16.0,
-          marginBottom: 2.0,
-          marker: (isOrdered, depth, index) {
-            if (isOrdered) {
-              return Text(
-                '${index + 1}. ',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? AppTheme.accentCyan : AppTheme.primary,
+    final markdownConfig =
+        (isDark ? MarkdownConfig.darkConfig : MarkdownConfig.defaultConfig)
+            .copy(
+              configs: [
+                CodeConfig(
+                  style: AppTheme.monoTextStyle(
+                    fontSize: 13.0,
+                    color: isDark
+                        ? const Color(0xFFFF7B72)
+                        : const Color(0xFFCF222E),
+                    backgroundColor: isDark
+                        ? const Color(0x266E7681)
+                        : const Color(0x1A1F2328),
+                  ),
                 ),
-              );
-            }
-            return Container(
-              margin: const EdgeInsets.only(right: 6, top: 6),
-              width: 5,
-              height: 5,
-              decoration: BoxDecoration(
-                color: isDark ? AppTheme.accentCyan : AppTheme.primary,
-                shape: BoxShape.circle,
-              ),
+                PConfig(
+                  textStyle: TextStyle(
+                    fontSize: 13.5,
+                    height: 1.45,
+                    color: baseColor,
+                  ),
+                ),
+                H1Config(
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: baseColor,
+                  ),
+                ),
+                H2Config(
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: baseColor,
+                  ),
+                ),
+                H3Config(
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w600,
+                    color: baseColor,
+                  ),
+                ),
+                H4Config(
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: baseColor,
+                  ),
+                ),
+                PreConfig(
+                  wrapper: (child, code, language) => CollapsibleCodeBlock(
+                    language: language,
+                    code: code,
+                    searchPattern: searchPattern,
+                  ),
+                ),
+                ListConfig(
+                  marginLeft: 16.0,
+                  marginBottom: 2.0,
+                  marker: (isOrdered, depth, index) {
+                    if (isOrdered) {
+                      return Text(
+                        '${index + 1}. ',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: isDark
+                              ? AppTheme.accentCyan
+                              : AppTheme.primary,
+                        ),
+                      );
+                    }
+                    return Container(
+                      margin: const EdgeInsets.only(right: 6, top: 6),
+                      width: 5,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: isDark ? AppTheme.accentCyan : AppTheme.primary,
+                        shape: BoxShape.circle,
+                      ),
+                    );
+                  },
+                ),
+              ],
             );
-          },
-        ),
-      ],
-    );
 
     return SelectionArea(
       child: MarkdownBlock(
@@ -136,7 +136,9 @@ class MarkdownRenderer extends StatelessWidget {
 
 class LatexSyntax extends m.InlineSyntax {
   LatexSyntax()
-      : super(r'(\$\$[\s\S]+?\$\$)|(\$.+?\$)|(\\\[[\s\S]+?\\\])|(\\\([\s\S]+?\\\))');
+    : super(
+        r'(\$\$[\s\S]+?\$\$)|(\$.+?\$)|(\\\[[\s\S]+?\\\])|(\\\([\s\S]+?\\\))',
+      );
 
   @override
   bool onMatch(m.InlineParser parser, Match match) {
@@ -188,7 +190,9 @@ class LatexNode extends SpanNode {
     final content = attributes['content'] ?? '';
     final isInline = attributes['isInline'] == 'true';
     final baseColor = isDark ? AppTheme.textMain : AppTheme.lightTextMain;
-    final style = (parentStyle ?? config.p.textStyle).copyWith(color: baseColor);
+    final style = (parentStyle ?? config.p.textStyle).copyWith(
+      color: baseColor,
+    );
 
     if (content.isEmpty) {
       return TextSpan(style: style, text: textContent);
@@ -197,10 +201,7 @@ class LatexNode extends SpanNode {
     final latex = Math.tex(
       content,
       mathStyle: isInline ? MathStyle.text : MathStyle.display,
-      textStyle: TextStyle(
-        fontSize: isInline ? 13.5 : 14.5,
-        color: baseColor,
-      ),
+      textStyle: TextStyle(fontSize: isInline ? 13.5 : 14.5, color: baseColor),
       onErrorFallback: (err) => Text(
         isInline ? '\$$content\$' : '\$\$\n$content\n\$\$',
         style: style.copyWith(
@@ -264,27 +265,25 @@ class CustomSearchTextNode extends SpanNode {
     var lastIdx = 0;
     for (final match in pattern.allMatches(text)) {
       if (match.start > lastIdx) {
-        spans.add(TextSpan(
-          text: text.substring(lastIdx, match.start),
-          style: style,
-        ));
+        spans.add(
+          TextSpan(text: text.substring(lastIdx, match.start), style: style),
+        );
       }
-      spans.add(TextSpan(
-        text: match.group(0),
-        style: style.copyWith(
-          backgroundColor: const Color(0x66F2CC60),
-          color: isDark ? const Color(0xFFFFF1A8) : const Color(0xFF5A4300),
-          fontWeight: FontWeight.bold,
+      spans.add(
+        TextSpan(
+          text: match.group(0),
+          style: style.copyWith(
+            backgroundColor: const Color(0x66F2CC60),
+            color: isDark ? const Color(0xFFFFF1A8) : const Color(0xFF5A4300),
+            fontWeight: FontWeight.bold,
+          ),
         ),
-      ));
+      );
       lastIdx = match.end;
     }
 
     if (lastIdx < text.length) {
-      spans.add(TextSpan(
-        text: text.substring(lastIdx),
-        style: style,
-      ));
+      spans.add(TextSpan(text: text.substring(lastIdx), style: style));
     }
 
     return TextSpan(children: spans);

@@ -28,7 +28,6 @@ class HtmlClipboardService implements ClipboardService {
     final itemCount = items.length ?? 0;
     for (var i = 0; i < itemCount; i++) {
       final item = items[i];
-      if (item == null) continue;
       if (item.type == null || !item.type!.startsWith('image/')) continue;
       final blob = item.getAsFile();
       if (blob == null) continue;

@@ -300,7 +300,8 @@ class _ChatViewState extends State<ChatView> {
                         msg.id,
                         () => GlobalKey(),
                       );
-                      final isTargetMatch = _matchedMessageIndices.isNotEmpty &&
+                      final isTargetMatch =
+                          _matchedMessageIndices.isNotEmpty &&
                           _matchedMessageIndices[_currentMatchIndex] == index;
                       return MessageBubble(
                         key: key,
@@ -358,7 +359,10 @@ class _ChatViewState extends State<ChatView> {
               style: const TextStyle(fontSize: 13),
               decoration: InputDecoration(
                 hintText: 'Find in conversation (supports regex)...',
-                hintStyle: const TextStyle(fontSize: 13, color: AppTheme.textMuted),
+                hintStyle: const TextStyle(
+                  fontSize: 13,
+                  color: AppTheme.textMuted,
+                ),
                 border: InputBorder.none,
                 isDense: true,
                 contentPadding: const EdgeInsets.symmetric(vertical: 6),
@@ -383,7 +387,9 @@ class _ChatViewState extends State<ChatView> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
               decoration: BoxDecoration(
-                color: _isCaseSensitive ? AppTheme.primary.withOpacity(0.2) : Colors.transparent,
+                color: _isCaseSensitive
+                    ? AppTheme.primary.withOpacity(0.2)
+                    : Colors.transparent,
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
@@ -391,7 +397,9 @@ class _ChatViewState extends State<ChatView> {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: _isCaseSensitive ? AppTheme.primary : AppTheme.textMuted,
+                  color: _isCaseSensitive
+                      ? AppTheme.primary
+                      : AppTheme.textMuted,
                 ),
               ),
             ),
@@ -407,7 +415,9 @@ class _ChatViewState extends State<ChatView> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
               decoration: BoxDecoration(
-                color: _isRegex ? AppTheme.primary.withOpacity(0.2) : Colors.transparent,
+                color: _isRegex
+                    ? AppTheme.primary.withOpacity(0.2)
+                    : Colors.transparent,
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
@@ -426,33 +436,48 @@ class _ChatViewState extends State<ChatView> {
                 (_searchController.text.isEmpty
                     ? ''
                     : (hasMatches
-                        ? '${_currentMatchIndex + 1} of ${_matchedMessageIndices.length}'
-                        : 'No results')),
+                          ? '${_currentMatchIndex + 1} of ${_matchedMessageIndices.length}'
+                          : 'No results')),
             style: TextStyle(
               fontSize: 11.5,
-              color: _searchError != null ? AppTheme.accentPink : AppTheme.textMuted,
+              color: _searchError != null
+                  ? AppTheme.accentPink
+                  : AppTheme.textMuted,
             ),
           ),
           IconButton(
             icon: const Icon(Icons.arrow_upward, size: 16),
             tooltip: 'Previous match (Shift+Enter)',
-            onPressed: !hasMatches ? null : () {
-              setState(() {
-                _currentMatchIndex = (_currentMatchIndex - 1 + _matchedMessageIndices.length) %
-                    _matchedMessageIndices.length;
-              });
-              _scrollToMessage(_matchedMessageIndices[_currentMatchIndex]);
-            },
+            onPressed: !hasMatches
+                ? null
+                : () {
+                    setState(() {
+                      _currentMatchIndex =
+                          (_currentMatchIndex -
+                              1 +
+                              _matchedMessageIndices.length) %
+                          _matchedMessageIndices.length;
+                    });
+                    _scrollToMessage(
+                      _matchedMessageIndices[_currentMatchIndex],
+                    );
+                  },
           ),
           IconButton(
             icon: const Icon(Icons.arrow_downward, size: 16),
             tooltip: 'Next match (Enter)',
-            onPressed: !hasMatches ? null : () {
-              setState(() {
-                _currentMatchIndex = (_currentMatchIndex + 1) % _matchedMessageIndices.length;
-              });
-              _scrollToMessage(_matchedMessageIndices[_currentMatchIndex]);
-            },
+            onPressed: !hasMatches
+                ? null
+                : () {
+                    setState(() {
+                      _currentMatchIndex =
+                          (_currentMatchIndex + 1) %
+                          _matchedMessageIndices.length;
+                    });
+                    _scrollToMessage(
+                      _matchedMessageIndices[_currentMatchIndex],
+                    );
+                  },
           ),
           IconButton(
             icon: const Icon(Icons.close, size: 16),

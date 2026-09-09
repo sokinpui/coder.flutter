@@ -39,6 +39,7 @@ dependencies:
   markdown: any
   markdown_widget: any
 
+  highlight: any
 dev_dependencies:
   flutter_test:
     sdk: flutter

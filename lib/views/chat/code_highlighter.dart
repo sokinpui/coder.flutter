@@ -199,31 +199,31 @@ class CodeHighlighter {
       var lastEnd = 0;
       for (final match in pattern.allMatches(text)) {
         if (match.start > lastEnd) {
-          newChildren.add(TextSpan(
-            text: text.substring(lastEnd, match.start),
-            style: span.style,
-          ));
+          newChildren.add(
+            TextSpan(
+              text: text.substring(lastEnd, match.start),
+              style: span.style,
+            ),
+          );
         }
-        newChildren.add(TextSpan(
-          text: match.group(0),
-          style: (span.style ?? AppTheme.monoTextStyle()).copyWith(
-            backgroundColor: const Color(0x66F2CC60),
-            color: isDark ? const Color(0xFFFFF1A8) : const Color(0xFF5A4300),
-            fontWeight: FontWeight.bold,
+        newChildren.add(
+          TextSpan(
+            text: match.group(0),
+            style: (span.style ?? AppTheme.monoTextStyle()).copyWith(
+              backgroundColor: const Color(0x66F2CC60),
+              color: isDark ? const Color(0xFFFFF1A8) : const Color(0xFF5A4300),
+              fontWeight: FontWeight.bold,
+            ),
           ),
-        ));
+        );
         lastEnd = match.end;
       }
       if (lastEnd < text.length) {
-        newChildren.add(TextSpan(
-          text: text.substring(lastEnd),
-          style: span.style,
-        ));
+        newChildren.add(
+          TextSpan(text: text.substring(lastEnd), style: span.style),
+        );
       }
-      return TextSpan(
-        style: span.style,
-        children: newChildren,
-      );
+      return TextSpan(style: span.style, children: newChildren);
     }
 
     if (children != null && children.isNotEmpty) {

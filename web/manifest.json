@@ -1,6 +1,6 @@
 {
-    "name": "coder_flutter",
-    "short_name": "coder_flutter",
+    "name": "coder",
+    "short_name": "coder",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0F1218",

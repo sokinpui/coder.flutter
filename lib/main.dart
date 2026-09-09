@@ -37,7 +37,7 @@ class _MyAppState extends State<MyApp> {
       listenable: _coderState,
       builder: (context, _) {
         return MaterialApp(
-          title: 'Coder',
+          title: 'coder',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme(),
           darkTheme: AppTheme.darkTheme(),

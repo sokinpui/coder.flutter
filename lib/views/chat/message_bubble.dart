@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/responsive.dart';
 import '../../core/widgets/hover_animated_button.dart';
 import '../../models/chat_message.dart';
 import 'markdown_renderer.dart';
@@ -16,6 +17,7 @@ class MessageBubble extends StatefulWidget {
     this.onDelete,
     this.onRegenerate,
     this.onApplyItf,
+    this.onUndoItf,
     this.onEdit,
     this.onBranch,
   });
@@ -25,6 +27,7 @@ class MessageBubble extends StatefulWidget {
   final bool isSearchMatch;
   final VoidCallback? onDelete;
   final VoidCallback? onRegenerate;
+  final Future<void> Function()? onUndoItf;
   final Future<void> Function(String content)? onApplyItf;
   final ValueChanged<String>? onEdit;
   final VoidCallback? onBranch;
@@ -72,25 +75,41 @@ class _MessageBubbleState extends State<MessageBubble> {
     final isDark = theme.brightness == Brightness.dark;
     final isImageMsg = widget.message.author == MessageAuthor.image;
     final isUserSide =
-        widget.message.author == MessageAuthor.user || isImageMsg;
+        widget.message.author == MessageAuthor.user ||
+        widget.message.author == MessageAuthor.command ||
+        isImageMsg;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isCompact = Responsive.isCompact(context);
+
+    final maxBubbleWidth = isCompact
+        ? (screenWidth * (isUserSide ? 0.82 : 0.88)).clamp(220.0, 600.0)
+        : 800.0;
+    final minBubbleWidth = _isEditing
+        ? (isCompact ? (maxBubbleWidth - 20).clamp(180.0, 320.0) : 320.0)
+        : 0.0;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: isUserSide
             ? MainAxisAlignment.end
             : MainAxisAlignment.start,
         children: [
-          if (!isUserSide) _buildAvatar(isUserSide),
-          const SizedBox(width: 10),
+          if (!isUserSide) ...[
+            _buildAvatar(isUserSide),
+            const SizedBox(width: 8),
+          ],
           Flexible(
             child: Container(
               constraints: BoxConstraints(
-                maxWidth: 800,
-                minWidth: _isEditing ? 320 : 0,
+                maxWidth: maxBubbleWidth,
+                minWidth: minBubbleWidth,
               ),
-              padding: const EdgeInsets.all(14),
+              padding: EdgeInsets.symmetric(
+                horizontal: isCompact ? 12 : 14,
+                vertical: isCompact ? 10 : 12,
+              ),
               decoration: BoxDecoration(
                 color: isUserSide
                     ? (isDark
@@ -121,7 +140,7 @@ class _MessageBubbleState extends State<MessageBubble> {
                     : CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (isImageMsg) _buildImagePayload(),
+                  if (isImageMsg) _buildImagePayload(maxBubbleWidth),
                   if (widget.message.reasoning.isNotEmpty)
                     _ReasoningCard(
                       reasoning: widget.message.reasoning,
@@ -129,8 +148,7 @@ class _MessageBubbleState extends State<MessageBubble> {
                     ),
                   if (_isEditing)
                     _buildInlineEditor(context, isDark)
-                  else if (!isImageMsg &&
-                      widget.message.content.isNotEmpty)
+                  else if (!isImageMsg && widget.message.content.isNotEmpty)
                     MarkdownRenderer(
                       content: widget.message.content,
                       searchPattern: widget.searchPattern,
@@ -147,8 +165,10 @@ class _MessageBubbleState extends State<MessageBubble> {
               ),
             ),
           ),
-          const SizedBox(width: 10),
-          if (isUserSide) _buildAvatar(isUserSide),
+          if (isUserSide) ...[
+            const SizedBox(width: 8),
+            _buildAvatar(isUserSide),
+          ],
         ],
       ),
     );
@@ -221,7 +241,7 @@ class _MessageBubbleState extends State<MessageBubble> {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           _buildAvatar(false),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           const GeneratingIndicator(),
         ],
       ),
@@ -230,17 +250,22 @@ class _MessageBubbleState extends State<MessageBubble> {
 
   Widget _buildActionBar(BuildContext context, bool isUser) {
     final msg = widget.message;
+    final isCommand =
+        msg.author == MessageAuthor.command ||
+        msg.author == MessageAuthor.commandResult ||
+        msg.author == MessageAuthor.commandError;
     final hasDiff =
         msg.content.contains('```diff') ||
         msg.content.contains('```rename') ||
         msg.content.contains('```delete');
 
     return Padding(
-      padding: const EdgeInsets.only(top: 6),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      padding: const EdgeInsets.only(top: 4),
+      child: Wrap(
+        spacing: 2,
+        runSpacing: 2,
         children: [
-          if (isUser && widget.onEdit != null)
+          if (msg.author == MessageAuthor.user && widget.onEdit != null)
             HoverAnimatedButton(
               tooltip: 'Edit Message',
               hoverScale: 1.15,
@@ -272,6 +297,14 @@ class _MessageBubbleState extends State<MessageBubble> {
               constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
               padding: EdgeInsets.zero,
             ),
+          if (!isUser && widget.onUndoItf != null)
+            IconButton(
+              icon: const Icon(Icons.undo, size: 15, color: AppTheme.textMuted),
+              tooltip: 'Undo Last Applied Changes',
+              onPressed: widget.onUndoItf,
+              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+              padding: EdgeInsets.zero,
+            ),
           if (widget.onBranch != null)
             IconButton(
               icon: const Icon(
@@ -284,7 +317,7 @@ class _MessageBubbleState extends State<MessageBubble> {
               constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
               padding: EdgeInsets.zero,
             ),
-          if (widget.onRegenerate != null)
+          if (widget.onRegenerate != null && !isCommand)
             IconButton(
               icon: const Icon(
                 Icons.refresh,
@@ -355,12 +388,12 @@ class _MessageBubbleState extends State<MessageBubble> {
     );
   }
 
-  Widget _buildImagePayload() {
+  Widget _buildImagePayload(double maxWidth) {
     if (widget.message.imageData != null) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(8),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 400, maxWidth: 600),
+          constraints: BoxConstraints(maxHeight: 400, maxWidth: maxWidth),
           child: Image.memory(widget.message.imageData!, fit: BoxFit.contain),
         ),
       );
@@ -388,12 +421,28 @@ class _MessageBubbleState extends State<MessageBubble> {
     IconData icon = Icons.smart_toy_outlined;
     Color color = AppTheme.accentCyan;
 
-    if (widget.message.author == MessageAuthor.image) {
-      icon = Icons.image_outlined;
-      color = AppTheme.primary;
-    } else if (isUserSide) {
-      icon = Icons.person;
-      color = AppTheme.primary;
+    switch (widget.message.author) {
+      case MessageAuthor.image:
+        icon = Icons.image_outlined;
+        color = AppTheme.primary;
+      case MessageAuthor.command:
+        icon = Icons.terminal;
+        color = AppTheme.primary;
+      case MessageAuthor.commandResult:
+        icon = Icons.check_circle_outline;
+        color = Colors.greenAccent;
+      case MessageAuthor.commandError:
+        icon = Icons.error_outline;
+        color = AppTheme.accentPink;
+      case MessageAuthor.system:
+        icon = Icons.info_outline;
+        color = AppTheme.textMuted;
+      case MessageAuthor.user:
+        icon = Icons.person;
+        color = AppTheme.primary;
+      case MessageAuthor.assistant:
+        icon = Icons.smart_toy_outlined;
+        color = AppTheme.accentCyan;
     }
 
     return CircleAvatar(
@@ -405,10 +454,7 @@ class _MessageBubbleState extends State<MessageBubble> {
 }
 
 class _ReasoningCard extends StatefulWidget {
-  const _ReasoningCard({
-    required this.reasoning,
-    required this.isDark,
-  });
+  const _ReasoningCard({required this.reasoning, required this.isDark});
 
   final String reasoning;
   final bool isDark;

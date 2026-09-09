@@ -11,6 +11,7 @@ class MainActivity : FlutterActivity() {
     private val SETTINGS_CHANNEL = "coder_flutter/settings"
     private var pendingResult: MethodChannel.Result? = null
     private val PICK_IMAGE_REQUEST = 1001
+    private val PICK_FILE_REQUEST = 1002
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -22,6 +23,13 @@ class MainActivity : FlutterActivity() {
                     addCategory(Intent.CATEGORY_OPENABLE)
                 }
                 startActivityForResult(intent, PICK_IMAGE_REQUEST)
+            } else if (call.method == "pickFile") {
+                pendingResult = result
+                val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                    type = "*/*"
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                }
+                startActivityForResult(intent, PICK_FILE_REQUEST)
             } else {
                 result.notImplemented()
             }
@@ -53,6 +61,27 @@ class MainActivity : FlutterActivity() {
                         val bytes = inputStream.readBytes()
                         pendingResult?.success(bytes)
                     } ?: pendingResult?.success(null)
+                } catch (e: Exception) {
+                    pendingResult?.error("READ_ERROR", e.message, null)
+                }
+            } else {
+                pendingResult?.success(null)
+            }
+            pendingResult = null
+        } else if (requestCode == PICK_FILE_REQUEST) {
+            if (resultCode == Activity.RESULT_OK && data?.data != null) {
+                try {
+                    val uri = data.data!!
+                    val cursor = contentResolver.query(uri, null, null, null, null)
+                    val nameIdx = cursor?.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    cursor?.moveToFirst()
+                    val name = if (nameIdx != null && nameIdx >= 0) cursor.getString(nameIdx) else "document.pdf"
+                    cursor?.close()
+                    val file = java.io.File(cacheDir, name)
+                    contentResolver.openInputStream(uri)?.use { input ->
+                        file.outputStream().use { output -> input.copyTo(output) }
+                    }
+                    pendingResult?.success(file.absolutePath)
                 } catch (e: Exception) {
                     pendingResult?.error("READ_ERROR", e.message, null)
                 }

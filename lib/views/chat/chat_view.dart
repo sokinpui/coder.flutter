@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/services/clipboard_service.dart';
+import '../../core/utils/responsive.dart';
 import '../../core/widgets/hover_animated_button.dart';
 import '../../core/theme/app_theme.dart';
+import '../settings/context_dialog.dart';
 import '../../state/coder_state.dart';
 import 'message_bubble.dart';
 
@@ -32,6 +34,7 @@ class _ChatViewState extends State<ChatView> {
   int _currentMatchIndex = 0;
   List<int> _matchedMessageIndices = [];
   RegExp? _activeSearchPattern;
+  bool _isPicking = false;
   String? _searchError;
   final List<Uint8List> _stagedImages = [];
   StreamSubscription<Uint8List>? _pastedImageSub;
@@ -178,17 +181,49 @@ class _ChatViewState extends State<ChatView> {
   }
 
   Future<void> _handleAttachImage() async {
-    final clipImg = await _clipboardService.getClipboardImage();
-    if (clipImg != null) {
-      if (mounted) setState(() => _stagedImages.add(clipImg));
+    if (_isPicking) return;
+    _isPicking = true;
+    try {
+      final picked = await _clipboardService.pickImage();
+      if (picked != null && mounted) {
+        setState(() => _stagedImages.add(picked));
+      }
+    } finally {
+      _isPicking = false;
       _maintainInputFocus();
-      return;
     }
-    final picked = await _clipboardService.pickImage();
-    if (picked != null && mounted) {
-      setState(() => _stagedImages.add(picked));
+  }
+
+  Future<void> _handleAddFileOrPdf() async {
+    if (_isPicking) return;
+    _isPicking = true;
+    try {
+      final path = await _clipboardService.pickFilePath();
+      if (path == null || path.isEmpty || !mounted) {
+        return;
+      }
+      if (path.toLowerCase().endsWith('.pdf')) {
+        final res = await widget.state.addPdf(path);
+        if (mounted && res != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(res), duration: const Duration(seconds: 2)),
+          );
+        }
+        return;
+      }
+      await widget.state.addContextPaths([path]);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Added $path to context'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } finally {
+      _isPicking = false;
+      _maintainInputFocus();
     }
-    _maintainInputFocus();
   }
 
   Future<void> _pasteClipboardImage() async {
@@ -335,6 +370,17 @@ class _ChatViewState extends State<ChatView> {
                           final summary = await widget.state.applyItf(
                             content: content,
                           );
+                          if (summary != null && context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(summary),
+                                duration: const Duration(seconds: 3),
+                              ),
+                            );
+                          }
+                        },
+                        onUndoItf: () async {
+                          final summary = await widget.state.undoItf();
                           if (summary != null && context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
@@ -570,6 +616,13 @@ class _ChatViewState extends State<ChatView> {
                     onTap: _handleAttachImage,
                   ),
                   _buildExploreCard(
+                    icon: Icons.picture_as_pdf_outlined,
+                    title: 'PDF & Vision Docs',
+                    desc:
+                        'Add PDF documents to context for automatic page rendering with pti.',
+                    onTap: _handleAddFileOrPdf,
+                  ),
+                  _buildExploreCard(
                     icon: Icons.terminal,
                     title: 'Context & Shell',
                     desc:
@@ -601,7 +654,7 @@ class _ChatViewState extends State<ChatView> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        width: 380,
+        constraints: const BoxConstraints(maxWidth: 380),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: isDark ? AppTheme.surface : AppTheme.lightSurface,
@@ -713,12 +766,18 @@ class _ChatViewState extends State<ChatView> {
   Widget _buildInputBar() {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final isCompact = Responsive.isCompact(context);
 
-    return Center(
+    final horizontalMargin = isCompact ? 10.0 : 16.0;
+    final bottomMargin = isCompact ? 8.0 : 16.0;
+
+    return SafeArea(
+      top: false,
+      child: Center(
       child: Container(
         constraints: const BoxConstraints(maxWidth: 840),
-        margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-        padding: const EdgeInsets.all(10),
+        margin: EdgeInsets.fromLTRB(horizontalMargin, 6, horizontalMargin, bottomMargin),
+        padding: EdgeInsets.symmetric(horizontal: isCompact ? 10 : 12, vertical: isCompact ? 8 : 10),
         decoration: BoxDecoration(
           color: isDark ? AppTheme.surface : AppTheme.lightSurface,
           borderRadius: BorderRadius.circular(18),
@@ -737,23 +796,26 @@ class _ChatViewState extends State<ChatView> {
             TextField(
               controller: _promptController,
               focusNode: _inputFocusNode,
-              maxLines: 6,
+              maxLines: isCompact ? 5 : 8,
               minLines: 1,
+              keyboardType: TextInputType.multiline,
+              textInputAction: TextInputAction.newline,
               style: TextStyle(
                 fontSize: 14,
                 color: isDark ? AppTheme.textMain : AppTheme.lightTextMain,
               ),
               decoration: InputDecoration(
-                hintText:
-                    'Start typing a prompt... (${_isMac ? 'Cmd+Enter' : 'Ctrl+Enter'} to send)',
+                hintText: isCompact
+                    ? 'Message Coder...'
+                    : 'Start typing a prompt... (${_isMac ? 'Cmd+Enter' : 'Ctrl+Enter'} to send)',
                 hintStyle: const TextStyle(
                   color: AppTheme.textMuted,
                   fontSize: 13,
                 ),
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
+                  horizontal: 6,
+                  vertical: 6,
                 ),
                 isDense: true,
               ),
@@ -761,6 +823,13 @@ class _ChatViewState extends State<ChatView> {
             const SizedBox(height: 4),
             Row(
               children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
                 IconButton(
                   icon: const Icon(
                     Icons.add_photo_alternate_outlined,
@@ -768,6 +837,16 @@ class _ChatViewState extends State<ChatView> {
                   ),
                   tooltip: 'Attach Image / Paste',
                   onPressed: _handleAttachImage,
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
+                  padding: EdgeInsets.zero,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.attach_file_outlined, size: 20),
+                  tooltip: 'Add File / PDF to Context',
+                  onPressed: _handleAddFileOrPdf,
                   constraints: const BoxConstraints(
                     minWidth: 32,
                     minHeight: 32,
@@ -838,7 +917,91 @@ class _ChatViewState extends State<ChatView> {
                     ),
                   ),
                 ],
-                const Spacer(),
+                if (widget.state.contextDocuments.isNotEmpty) ...[
+                  const SizedBox(width: 6),
+                  InkWell(
+                    onTap: () => showDialog(
+                      context: context,
+                      builder: (_) => ContextDialog(state: widget.state),
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? AppTheme.surfaceSubtle
+                            : AppTheme.lightSurfaceSubtle,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.picture_as_pdf_outlined,
+                            size: 12,
+                            color: AppTheme.accentYellow,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${widget.state.contextDocuments.length} doc${widget.state.contextDocuments.length == 1 ? '' : 's'}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+                if (widget.state.contextFiles.isNotEmpty) ...[
+                  const SizedBox(width: 6),
+                  InkWell(
+                    onTap: () => showDialog(
+                      context: context,
+                      builder: (_) => ContextDialog(state: widget.state),
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? AppTheme.surfaceSubtle
+                            : AppTheme.lightSurfaceSubtle,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.folder_outlined,
+                            size: 12,
+                            color: AppTheme.accentCyan,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${widget.state.contextFiles.length} file${widget.state.contextFiles.length == 1 ? '' : 's'}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 if (widget.state.isGenerating)
                   HoverAnimatedButton(
                     tooltip: 'Cancel (Esc)',
@@ -888,6 +1051,7 @@ class _ChatViewState extends State<ChatView> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

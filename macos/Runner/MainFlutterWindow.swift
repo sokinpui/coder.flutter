@@ -48,6 +48,7 @@ class MainFlutterWindow: NSWindow {
         result(nil)
 
       case "pickImage":
+        NSApp.activate(ignoringOtherApps: true)
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
@@ -55,6 +56,18 @@ class MainFlutterWindow: NSWindow {
         panel.allowedFileTypes = ["png", "jpg", "jpeg", "gif", "webp", "bmp"]
         if panel.runModal() == .OK, let url = panel.url, let data = try? Data(contentsOf: url) {
           result(FlutterStandardTypedData(bytes: data))
+          return
+        }
+        result(nil)
+
+      case "pickFile":
+        NSApp.activate(ignoringOtherApps: true)
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        if panel.runModal() == .OK, let url = panel.url {
+          result(url.path)
           return
         }
         result(nil)

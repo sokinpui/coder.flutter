@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 
 import '../core/services/settings_service.dart';
@@ -28,6 +30,8 @@ class CoderState extends ChangeNotifier {
   String _sessionTitle = 'New Chat';
   List<String> _availableModels = [];
   bool _isSearchVisible = false;
+  List<String> _contextFiles = [];
+  List<String> _contextDocuments = [];
   List<SessionInfo> _historySessions = [];
   final List<ChatMessage> _messages = [];
 
@@ -45,12 +49,21 @@ class CoderState extends ChangeNotifier {
   String get activeModel => _activeModel;
   String get sessionTitle => _sessionTitle;
   List<String> get availableModels => _availableModels;
+  List<String> get contextFiles => List.unmodifiable(_contextFiles);
+  List<String> get contextDocuments => List.unmodifiable(_contextDocuments);
   List<SessionInfo> get historySessions => _historySessions;
   List<ChatMessage> get messages => List.unmodifiable(_messages);
   ConnectionStateStatus get connectionStatus => _connectionStatus;
   String? get errorMessage => _errorMessage;
   bool get isGenerating => _isGenerating;
   int get tokenCount => _tokenCount;
+
+  String get httpBaseUrl {
+    final scheme = _useTls ? 'https' : 'http';
+    return '$scheme://$_serverHost:$_serverPort';
+  }
+
+  String get pdfUploadUrl => '$httpBaseUrl/upload/pdf';
 
   String get websocketUrl {
     final scheme = _useTls ? 'wss' : 'ws';
@@ -174,6 +187,20 @@ class CoderState extends ChangeNotifier {
         if (res.containsKey('tokenCount')) {
           _tokenCount = (res['tokenCount'] as num?)?.toInt() ?? 0;
         }
+        if (res.containsKey('contextFiles')) {
+          _contextFiles =
+              (res['contextFiles'] as List?)
+                  ?.map((e) => e.toString())
+                  .toList() ??
+              [];
+        }
+        if (res.containsKey('contextDocuments')) {
+          _contextDocuments =
+              (res['contextDocuments'] as List?)
+                  ?.map((e) => e.toString())
+                  .toList() ??
+              [];
+        }
       }
       _sessionTitle = 'New Chat';
       _messages.clear();
@@ -185,6 +212,8 @@ class CoderState extends ChangeNotifier {
     _isGenerating = false;
     _tokenCount = 0;
     _messages.clear();
+    _contextFiles.clear();
+    _contextDocuments.clear();
     _sessionTitle = 'New Chat';
     notifyListeners();
     await _initializeRemoteSession();
@@ -398,6 +427,20 @@ class CoderState extends ChangeNotifier {
         if (res.containsKey('tokenCount')) {
           _tokenCount = (res['tokenCount'] as num?)?.toInt() ?? 0;
         }
+        if (res.containsKey('contextFiles')) {
+          _contextFiles =
+              (res['contextFiles'] as List?)
+                  ?.map((e) => e.toString())
+                  .toList() ??
+              [];
+        }
+        if (res.containsKey('contextDocuments')) {
+          _contextDocuments =
+              (res['contextDocuments'] as List?)
+                  ?.map((e) => e.toString())
+                  .toList() ??
+              [];
+        }
         _messages.clear();
         _messages.addAll(_parseMessagesFromRaw(res['messages'] as List?));
         notifyListeners();
@@ -416,6 +459,10 @@ class CoderState extends ChangeNotifier {
       if (m is! Map) continue;
       final typeInt = m['Type'] as int? ?? 0;
       final content = m['Content'] as String? ?? '';
+      if (typeInt == 8 || typeInt == 9 || typeInt == 5 || typeInt == 6) {
+        continue;
+      }
+
       final isImage = typeInt == 7;
       final isAssistant = typeInt == 1;
 
@@ -426,12 +473,33 @@ class CoderState extends ChangeNotifier {
         } catch (_) {}
       }
 
+      MessageAuthor author;
+      if (isImage) {
+        author = MessageAuthor.image;
+      } else if (isAssistant) {
+        author = MessageAuthor.assistant;
+      } else if (typeInt == 2 ||
+          typeInt == 10 ||
+          typeInt == 12 ||
+          typeInt == 14 ||
+          typeInt == 17) {
+        author = MessageAuthor.command;
+      } else if (typeInt == 3 ||
+          typeInt == 11 ||
+          typeInt == 13 ||
+          typeInt == 15 ||
+          typeInt == 18) {
+        author = MessageAuthor.commandResult;
+      } else if (typeInt == 4 || typeInt == 16 || typeInt == 19) {
+        author = MessageAuthor.commandError;
+      } else {
+        author = MessageAuthor.user;
+      }
+
       result.add(
         ChatMessage(
           id: UniqueKey().toString(),
-          author: isImage
-              ? MessageAuthor.image
-              : (isAssistant ? MessageAuthor.assistant : MessageAuthor.user),
+          author: author,
           content: content,
           imagePath: isImage ? content : null,
           imageData: imgData,
@@ -449,10 +517,126 @@ class CoderState extends ChangeNotifier {
       }
       final res = await _client.request('session/itf/apply', params);
       if (res is Map && res.containsKey('summary')) {
+        await fetchContext();
         return res['summary'] as String?;
       }
     } catch (_) {}
     return null;
+  }
+
+  Future<String?> undoItf() async {
+    try {
+      final res = await _client.request('session/itf/undo');
+      if (res is Map && res.containsKey('summary')) {
+        await fetchContext();
+        return res['summary'] as String?;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<String?> uploadPdfAndAdd({
+    required String filename,
+    required List<int> bytes,
+    String? pages,
+  }) async {
+    try {
+      final request = http.MultipartRequest('POST', Uri.parse(pdfUploadUrl));
+      request.files.add(
+        http.MultipartFile.fromBytes('file', bytes, filename: filename),
+      );
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+      if (response.statusCode != 200) {
+        _errorMessage =
+            'Upload failed (${response.statusCode}): ${response.body}';
+        notifyListeners();
+        return null;
+      }
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map || decoded['path'] == null) {
+        _errorMessage = 'Invalid response from server during upload';
+        notifyListeners();
+        return null;
+      }
+
+      final remotePath = decoded['path'] as String;
+      return await addPdf(remotePath, pages: pages);
+    } catch (e) {
+      _errorMessage = 'Failed to upload PDF: $e';
+      notifyListeners();
+      return null;
+    }
+  }
+
+  Future<String?> addPdf(String path, {String? pages}) async {
+    final file = File(path);
+    if (await file.exists()) {
+      final bytes = await file.readAsBytes();
+      final filename = file.uri.pathSegments.last;
+      return uploadPdfAndAdd(filename: filename, bytes: bytes, pages: pages);
+    }
+    try {
+      final params = <String, dynamic>{'path': path};
+      if (pages != null && pages.trim().isNotEmpty) {
+        params['pages'] = pages.trim();
+      }
+      final res = await _client.request('session/pdf/add', params);
+      if (res is Map) {
+        if (res.containsKey('tokenCount')) {
+          _tokenCount = (res['tokenCount'] as num?)?.toInt() ?? _tokenCount;
+        }
+        await fetchContext();
+        final pagesAdded = res['pagesAdded'] as int? ?? 0;
+        return 'Added PDF ($pagesAdded page${pagesAdded == 1 ? '' : 's'}) to context';
+      }
+    } catch (e) {
+      _errorMessage = 'Failed to add PDF: $e';
+      notifyListeners();
+    }
+    return null;
+  }
+
+  Future<void> addContextPaths(List<String> paths) async {
+    try {
+      await _client.request('session/context/add', {'paths': paths});
+      await fetchContext();
+    } catch (_) {}
+  }
+
+  Future<void> excludeContextPaths(List<String> paths) async {
+    try {
+      await _client.request('session/context/exclude', {'paths': paths});
+      await fetchContext();
+    } catch (_) {}
+  }
+
+  Future<void> fetchContext() async {
+    try {
+      final res = await _client.request('session/context/get');
+      if (res is Map) {
+        if (res.containsKey('contextFiles')) {
+          _contextFiles =
+              (res['contextFiles'] as List?)
+                  ?.map((e) => e.toString())
+                  .toList() ??
+              [];
+        }
+        if (res.containsKey('contextDocuments')) {
+          _contextDocuments =
+              (res['contextDocuments'] as List?)
+                  ?.map((e) => e.toString())
+                  .toList() ??
+              [];
+        }
+        if (res.containsKey('tokenCount')) {
+          _tokenCount = (res['tokenCount'] as num?)?.toInt() ?? _tokenCount;
+        }
+        notifyListeners();
+      }
+    } catch (_) {}
   }
 
   Future<void> setModel(String model) async {
@@ -505,6 +689,20 @@ class CoderState extends ChangeNotifier {
         if (res.containsKey('tokenCount')) {
           _tokenCount = (res['tokenCount'] as num?)?.toInt() ?? 0;
         }
+        if (res.containsKey('contextFiles')) {
+          _contextFiles =
+              (res['contextFiles'] as List?)
+                  ?.map((e) => e.toString())
+                  .toList() ??
+              [];
+        }
+        if (res.containsKey('contextDocuments')) {
+          _contextDocuments =
+              (res['contextDocuments'] as List?)
+                  ?.map((e) => e.toString())
+                  .toList() ??
+              [];
+        }
         _messages.clear();
         _messages.addAll(_parseMessagesFromRaw(res['messages'] as List?));
         notifyListeners();
@@ -547,6 +745,7 @@ class CoderState extends ChangeNotifier {
             _messages.last.author == MessageAuthor.assistant) {
           _messages.last.isGenerating = false;
         }
+        fetchContext();
         fetchHistory();
       }
       notifyListeners();
@@ -556,8 +755,17 @@ class CoderState extends ChangeNotifier {
     if (method == 'session/event' && params is Map) {
       if (params['type'] == 'title' && params.containsKey('title')) {
         _sessionTitle = params['title'] as String;
-        fetchHistory();
+      } else if (params.containsKey('payload') && params['payload'] != null) {
+        final payload = params['payload'].toString();
+        if (_messages.isNotEmpty &&
+            _messages.last.author == MessageAuthor.assistant &&
+            _messages.last.content.isEmpty) {
+          _messages.last.content = payload;
+          _messages.last.author = MessageAuthor.commandResult;
+        }
+        fetchContext();
       }
+      fetchHistory();
       notifyListeners();
       return;
     }

@@ -49,14 +49,31 @@ class IoClipboardService implements ClipboardService {
     }
     if (Platform.isMacOS) {
       try {
-        final bytes = await _macClipboardChannel.invokeMethod<Uint8List>(
+        return await _macClipboardChannel.invokeMethod<Uint8List>(
           'pickImage',
         );
-        if (bytes != null) {
-          return bytes;
-        }
-      } catch (_) {}
-      return getClipboardImage();
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  @override
+  Future<String?> pickFilePath() async {
+    if (Platform.isAndroid) {
+      try {
+        return await _androidPickerChannel.invokeMethod<String>('pickFile');
+      } catch (_) {
+        return null;
+      }
+    }
+    if (Platform.isMacOS) {
+      try {
+        return await _macClipboardChannel.invokeMethod<String>('pickFile');
+      } catch (_) {
+        return null;
+      }
     }
     return null;
   }

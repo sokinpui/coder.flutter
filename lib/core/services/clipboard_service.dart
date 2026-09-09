@@ -7,6 +7,7 @@ abstract class ClipboardService {
   Stream<Uint8List> get onImagePasted;
   Future<Uint8List?> getClipboardImage();
   Future<Uint8List?> pickImage();
+  Future<String?> pickFilePath();
 
   static ClipboardService create() => createClipboardService();
 }

@@ -38,6 +38,7 @@ dependencies:
   flutter_math_fork: any
   markdown: any
   markdown_widget: any
+  http: any
 
   highlight: any
 dev_dependencies:

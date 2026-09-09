@@ -1,6 +1,14 @@
 import 'dart:typed_data';
 
-enum MessageAuthor { user, assistant, system, image }
+enum MessageAuthor {
+  user,
+  assistant,
+  system,
+  image,
+  command,
+  commandResult,
+  commandError,
+}
 
 class ChatMessage {
   ChatMessage({
@@ -15,7 +23,7 @@ class ChatMessage {
   }) : timestamp = timestamp ?? DateTime.now();
 
   final String id;
-  final MessageAuthor author;
+  MessageAuthor author;
   String content;
   String reasoning;
   final String? imagePath;

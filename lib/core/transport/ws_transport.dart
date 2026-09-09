@@ -1,6 +1,4 @@
-import 'ws_transport_stub.dart'
-    if (dart.library.io) 'ws_transport_io.dart'
-    if (dart.library.html) 'ws_transport_html.dart';
+import 'ws_transport_io.dart';
 
 abstract class WsTransport {
   Stream<String> get stream;

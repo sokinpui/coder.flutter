@@ -1,6 +1,4 @@
-import 'settings_service_stub.dart'
-    if (dart.library.io) 'settings_service_io.dart'
-    if (dart.library.html) 'settings_service_html.dart';
+import 'settings_service_io.dart';
 
 abstract class SettingsService {
   Future<Map<String, dynamic>> loadSettings();

@@ -26,9 +26,6 @@ void main() {
   test('Generate app launcher icons across all platforms', () async {
     final targets = <String, int>{
       'assets/icon/app_icon.png': 1024,
-      'web/icons/Icon-192.png': 192,
-      'web/icons/Icon-512.png': 512,
-      'web/favicon.png': 64,
       'macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_16.png': 16,
       'macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_32.png': 32,
       'macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_64.png': 64,

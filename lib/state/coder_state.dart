@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../core/services/settings_service.dart';
@@ -21,7 +20,7 @@ class CoderState extends ChangeNotifier {
 
   String _serverHost = '127.0.0.1';
   int _serverPort = 9005;
-  bool _useTls = kIsWeb && Uri.base.scheme == 'https';
+  bool _useTls = false;
   ThemeMode _themeMode = ThemeMode.light;
   bool _isSidebarVisible = true;
   String _activeModel = 'default';

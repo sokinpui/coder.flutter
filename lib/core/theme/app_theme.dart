@@ -37,9 +37,6 @@ class AppTheme {
   ];
 
   static String get monoFontFamily {
-    if (kIsWeb) {
-      return 'CoderMono';
-    }
     switch (defaultTargetPlatform) {
       case TargetPlatform.macOS:
       case TargetPlatform.iOS:

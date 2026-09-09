@@ -21,6 +21,7 @@ class IOWsTransport implements WsTransport {
   Future<void> connect(String url) async {
     await close();
     _socket = await WebSocket.connect(url);
+    _socket!.pingInterval = const Duration(seconds: 15);
     _socket!.listen(
       (data) {
         if (data is String) {
@@ -33,8 +34,11 @@ class IOWsTransport implements WsTransport {
       },
       onError: (error) {
         _controller.addError(error);
+        close();
       },
-      onDone: () {},
+      onDone: () {
+        close();
+      },
       cancelOnError: false,
     );
   }

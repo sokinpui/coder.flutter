@@ -26,8 +26,11 @@ class ResponsiveHome extends StatelessWidget {
 
   Widget _buildCompactLayout(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
 
     return Scaffold(
+      key: scaffoldKey,
+      drawerEdgeDragWidth: MediaQuery.of(context).size.width,
       appBar: AppBar(
         leading: Builder(
           builder: (ctx) => IconButton(
@@ -92,7 +95,18 @@ class ResponsiveHome extends StatelessWidget {
           onSessionSelected: () => Navigator.of(context).pop(),
         ),
       ),
-      body: ChatView(state: state),
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onHorizontalDragEnd: (details) {
+          final velocity = details.primaryVelocity ?? 0;
+          if (velocity > 280) {
+            scaffoldKey.currentState?.openDrawer();
+          } else if (velocity < -280) {
+            scaffoldKey.currentState?.closeDrawer();
+          }
+        },
+        child: ChatView(state: state),
+      ),
     );
   }
 
@@ -100,10 +114,24 @@ class ResponsiveHome extends StatelessWidget {
     return Scaffold(
       body: Row(
         children: [
-          if (state.isSidebarVisible) ...[
-            SessionSidebar(state: state),
-            const VerticalDivider(),
-          ],
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOutCubic,
+            width: state.isSidebarVisible ? 280.0 : 0.0,
+            child: ClipRect(
+              child: OverflowBox(
+                minWidth: 280.0,
+                maxWidth: 280.0,
+                alignment: Alignment.topLeft,
+                child: Row(
+                  children: [
+                    Expanded(child: SessionSidebar(state: state)),
+                    const VerticalDivider(width: 1),
+                  ],
+                ),
+              ),
+            ),
+          ),
           Expanded(
             child: Column(
               children: [

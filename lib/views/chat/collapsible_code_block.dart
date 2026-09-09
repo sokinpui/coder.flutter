@@ -24,6 +24,25 @@ class CollapsibleCodeBlock extends StatefulWidget {
 class _CollapsibleCodeBlockState extends State<CollapsibleCodeBlock> {
   bool _isCollapsed = false;
 
+  @override
+  void initState() {
+    super.initState();
+    _checkSearchExpansion();
+  }
+
+  @override
+  void didUpdateWidget(CollapsibleCodeBlock oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _checkSearchExpansion();
+  }
+
+  void _checkSearchExpansion() {
+    final pattern = widget.searchPattern;
+    if (pattern != null && _isCollapsed && pattern.hasMatch(widget.code)) {
+      _isCollapsed = false;
+    }
+  }
+
   int get _lineCount {
     if (widget.code.isEmpty) {
       return 0;

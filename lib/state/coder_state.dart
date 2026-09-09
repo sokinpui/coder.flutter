@@ -15,6 +15,7 @@ enum ConnectionStateStatus { disconnected, connecting, connected, error }
 class CoderState extends ChangeNotifier {
   CoderState() {
     _client.onNotification = _onServerNotification;
+    _client.onDisconnected = _handleUnexpectedDisconnect;
     _loadSavedSettingsAndConnect();
   }
 
@@ -37,8 +38,12 @@ class CoderState extends ChangeNotifier {
 
   ConnectionStateStatus _connectionStatus = ConnectionStateStatus.disconnected;
   String? _errorMessage;
+  Future<void> Function()? _lastFailedAction;
   bool _isGenerating = false;
   int _tokenCount = 0;
+  Timer? _reconnectTimer;
+  int _reconnectAttempts = 0;
+  bool _isAutoReconnecting = false;
 
   String get serverHost => _serverHost;
   int get serverPort => _serverPort;
@@ -56,6 +61,7 @@ class CoderState extends ChangeNotifier {
   ConnectionStateStatus get connectionStatus => _connectionStatus;
   String? get errorMessage => _errorMessage;
   bool get isGenerating => _isGenerating;
+  bool get isAutoReconnecting => _isAutoReconnecting;
   int get tokenCount => _tokenCount;
 
   String get httpBaseUrl {
@@ -119,6 +125,42 @@ class CoderState extends ChangeNotifier {
     _persistSettings();
   }
 
+  void clearError() {
+    _errorMessage = null;
+    notifyListeners();
+  }
+
+  Future<void> retryLastAction() async {
+    final action = _lastFailedAction;
+    _errorMessage = null;
+    notifyListeners();
+    if (action != null) {
+      await action();
+      return;
+    }
+    await initConnection(preserveSession: true);
+  }
+
+  void _handleUnexpectedDisconnect() {
+    if (_connectionStatus == ConnectionStateStatus.disconnected) return;
+    _connectionStatus = ConnectionStateStatus.disconnected;
+    _isAutoReconnecting = true;
+    notifyListeners();
+    _scheduleAutoReconnect();
+  }
+
+  void _scheduleAutoReconnect() {
+    _reconnectTimer?.cancel();
+    final delay = (_reconnectAttempts < 4)
+        ? Duration(seconds: 2 * (_reconnectAttempts + 1))
+        : const Duration(seconds: 12);
+    _reconnectAttempts++;
+    _reconnectTimer = Timer(delay, () async {
+      if (_connectionStatus == ConnectionStateStatus.connected) return;
+      await initConnection(preserveSession: true);
+    });
+  }
+
   void toggleSidebar() {
     _isSidebarVisible = !_isSidebarVisible;
     notifyListeners();
@@ -154,23 +196,41 @@ class CoderState extends ChangeNotifier {
     await initConnection();
   }
 
-  Future<void> initConnection() async {
+  Future<void> initConnection({bool preserveSession = false}) async {
+    _reconnectTimer?.cancel();
     _connectionStatus = ConnectionStateStatus.connecting;
     _errorMessage = null;
     notifyListeners();
 
     try {
       await _client.connect(websocketUrl);
+      _reconnectAttempts = 0;
+      _isAutoReconnecting = false;
       _connectionStatus = ConnectionStateStatus.connected;
       notifyListeners();
-      await _initializeRemoteSession();
+
+      if (!preserveSession || _messages.isEmpty) {
+        await _initializeRemoteSession();
+      } else {
+        await fetchContext();
+      }
       await fetchModels();
       await fetchHistory();
     } catch (e) {
       _connectionStatus = ConnectionStateStatus.error;
       _errorMessage = 'Failed to connect to Coder server ($websocketUrl): $e';
+      _lastFailedAction = () =>
+          initConnection(preserveSession: preserveSession);
+      _isAutoReconnecting = true;
+      _scheduleAutoReconnect();
       notifyListeners();
     }
+  }
+
+  void cancelAutoReconnect() {
+    _reconnectTimer?.cancel();
+    _isAutoReconnecting = false;
+    notifyListeners();
   }
 
   Future<void> _initializeRemoteSession() async {
@@ -209,6 +269,7 @@ class CoderState extends ChangeNotifier {
   }
 
   Future<void> newChat() async {
+    _isSearchVisible = false;
     _isGenerating = false;
     _tokenCount = 0;
     _messages.clear();
@@ -228,6 +289,7 @@ class CoderState extends ChangeNotifier {
     if (_isGenerating) {
       return;
     }
+    _isSearchVisible = false;
 
     final effectivePrompt = prompt.isEmpty && hasImages
         ? 'What is in this image?'
@@ -275,6 +337,7 @@ class CoderState extends ChangeNotifier {
       await _client.request('session/prompt', params);
     } catch (e) {
       aiMsg.content = 'Error sending prompt: $e';
+      _lastFailedAction = () => sendPrompt(text, images: images);
       aiMsg.isGenerating = false;
       _isGenerating = false;
       notifyListeners();
@@ -332,6 +395,7 @@ class CoderState extends ChangeNotifier {
     if (_isGenerating) {
       return;
     }
+    _isSearchVisible = false;
     final index = _messages.indexWhere((m) => m.id == messageId);
     if (index == -1) {
       return;
@@ -415,6 +479,7 @@ class CoderState extends ChangeNotifier {
     if (_isGenerating) {
       return;
     }
+    _isSearchVisible = false;
     final index = _messages.indexWhere((m) => m.id == messageId);
     if (index == -1) {
       return;
@@ -594,6 +659,7 @@ class CoderState extends ChangeNotifier {
       }
     } catch (e) {
       _errorMessage = 'Failed to add PDF: $e';
+      _lastFailedAction = () => addPdf(path, pages: pages);
       notifyListeners();
     }
     return null;
@@ -682,6 +748,7 @@ class CoderState extends ChangeNotifier {
   }
 
   Future<void> loadSession(String filename) async {
+    _isSearchVisible = false;
     try {
       final res = await _client.request('history/load', {'filename': filename});
       if (res is Map) {
@@ -773,6 +840,7 @@ class CoderState extends ChangeNotifier {
 
   @override
   void dispose() {
+    _reconnectTimer?.cancel();
     _client.disconnect();
     super.dispose();
   }

@@ -11,10 +11,14 @@ class MarkdownRenderer extends StatelessWidget {
     super.key,
     required this.content,
     this.searchPattern,
+    this.messageId,
+    this.activeSearchOccurrenceInMessage,
   });
 
   final String content;
   final RegExp? searchPattern;
+  final String? messageId;
+  final int? activeSearchOccurrenceInMessage;
 
   @override
   Widget build(BuildContext context) {
@@ -22,6 +26,7 @@ class MarkdownRenderer extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
     final baseColor = isDark ? AppTheme.textMain : AppTheme.lightTextMain;
 
+    final occurrenceCounter = _SearchOccurrenceCounter();
     final generator = MarkdownGenerator(
       inlineSyntaxList: [LatexSyntax()],
       generators: [
@@ -31,8 +36,14 @@ class MarkdownRenderer extends StatelessWidget {
               LatexNode(e.attributes, e.textContent, config, isDark),
         ),
       ],
-      textGenerator: (node, config, visitor) =>
-          CustomSearchTextNode(node.textContent, searchPattern, isDark),
+      textGenerator: (node, config, visitor) => CustomSearchTextNode(
+        node.textContent,
+        searchPattern,
+        messageId,
+        isDark,
+        activeSearchOccurrenceInMessage,
+        occurrenceCounter,
+      ),
     );
 
     final markdownConfig =
@@ -234,7 +245,6 @@ class LatexNode extends SpanNode {
 
     return WidgetSpan(
       child: Container(
-        width: double.infinity,
         margin: const EdgeInsets.symmetric(vertical: 8),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
@@ -256,12 +266,26 @@ class LatexNode extends SpanNode {
   }
 }
 
+class _SearchOccurrenceCounter {
+  int value = 0;
+}
+
 class CustomSearchTextNode extends SpanNode {
-  CustomSearchTextNode(this.text, this.searchPattern, this.isDark);
+  CustomSearchTextNode(
+    this.text,
+    this.searchPattern,
+    this.messageId,
+    this.isDark,
+    this.activeOccurrenceIndex,
+    this.occurrenceCounter,
+  );
 
   final String text;
   final RegExp? searchPattern;
+  final String? messageId;
   final bool isDark;
+  final int? activeOccurrenceIndex;
+  final _SearchOccurrenceCounter occurrenceCounter;
 
   @override
   InlineSpan build() {
@@ -279,16 +303,39 @@ class CustomSearchTextNode extends SpanNode {
           TextSpan(text: text.substring(lastIdx, match.start), style: style),
         );
       }
-      spans.add(
-        TextSpan(
-          text: match.group(0),
-          style: style.copyWith(
-            backgroundColor: const Color(0x66F2CC60),
-            color: isDark ? const Color(0xFFFFF1A8) : const Color(0xFF5A4300),
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+      final isCurrentActive =
+          activeOccurrenceIndex != null &&
+          occurrenceCounter.value == activeOccurrenceIndex;
+
+      final matchText = match.group(0) ?? '';
+      final highlightStyle = style.copyWith(
+        backgroundColor: isCurrentActive
+            ? const Color(0xFFFF9800)
+            : const Color(0x66F2CC60),
+        color: isCurrentActive
+            ? Colors.black
+            : (isDark ? const Color(0xFFFFF1A8) : const Color(0xFF5A4300)),
+        fontWeight: FontWeight.bold,
       );
+
+      if (isCurrentActive && messageId != null) {
+        spans.add(
+          WidgetSpan(
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+            child: Container(
+              key: ValueKey(
+                'active_search_${messageId}_${occurrenceCounter.value}',
+              ),
+              decoration: const BoxDecoration(color: Color(0xFFFF9800)),
+              child: Text(matchText, style: highlightStyle),
+            ),
+          ),
+        );
+      } else {
+        spans.add(TextSpan(text: matchText, style: highlightStyle));
+      }
+      occurrenceCounter.value++;
       lastIdx = match.end;
     }
 

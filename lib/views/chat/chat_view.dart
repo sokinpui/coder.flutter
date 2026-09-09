@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/services/clipboard_service.dart';
 import '../../core/theme/app_theme.dart';
+import '../../models/staged_attachment.dart';
 import '../settings/context_dialog.dart';
 import '../settings/model_picker_dialog.dart';
 import '../../state/coder_state.dart';
@@ -11,7 +12,18 @@ import 'empty_state.dart';
 import 'input_bar.dart';
 import 'message_bubble.dart';
 import 'search_bar.dart';
-import 'staged_images_preview.dart';
+import 'staged_attachments_preview.dart';
+
+class _SearchOccurrence {
+  const _SearchOccurrence({
+    required this.messageIndex,
+    required this.messageId,
+    required this.occurrenceIndexInMessage,
+  });
+  final int messageIndex;
+  final String messageId;
+  final int occurrenceIndexInMessage;
+}
 
 class ChatView extends StatefulWidget {
   const ChatView({super.key, required this.state});
@@ -34,11 +46,12 @@ class _ChatViewState extends State<ChatView> {
   bool _isRegex = false;
   bool _isCaseSensitive = false;
   int _currentMatchIndex = 0;
-  List<int> _matchedMessageIndices = [];
+  List<_SearchOccurrence> _searchOccurrences = [];
   RegExp? _activeSearchPattern;
   bool _isPicking = false;
   String? _searchError;
-  final List<Uint8List> _stagedImages = [];
+  final List<StagedAttachment> _stagedAttachments = [];
+  int _lastMessageCount = 0;
 
   bool get _isMac =>
       defaultTargetPlatform == TargetPlatform.macOS ||
@@ -71,6 +84,36 @@ class _ChatViewState extends State<ChatView> {
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
+    _lastMessageCount = widget.state.messages.length;
+  }
+
+  @override
+  void didUpdateWidget(ChatView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.state.isSearchVisible && widget.state.isSearchVisible) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _searchFocusNode.requestFocus();
+        _searchController.selection = TextSelection(
+          baseOffset: 0,
+          extentOffset: _searchController.text.length,
+        );
+        if (_searchOccurrences.isNotEmpty) {
+          _scrollToCurrentMatch();
+        }
+      });
+      return;
+    }
+
+    if (oldWidget.state.isSearchVisible && !widget.state.isSearchVisible) {
+      _searchController.clear();
+      setState(() {
+        _activeSearchPattern = null;
+        _searchOccurrences = [];
+        _currentMatchIndex = 0;
+        _searchError = null;
+      });
+    }
   }
 
   @override
@@ -103,12 +146,24 @@ class _ChatViewState extends State<ChatView> {
     });
   }
 
+  void _autoScrollToBottomIfAppropriate() {
+    if (widget.state.isSearchVisible) return;
+    if (!_scrollController.hasClients) return;
+
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.offset;
+    final isNearBottom = (maxScroll - currentScroll) <= 150.0;
+    if (isNearBottom) {
+      _scrollToBottom();
+    }
+  }
+
   void _onSearchChanged() {
     final query = _searchController.text;
     if (query.isEmpty) {
       setState(() {
         _activeSearchPattern = null;
-        _matchedMessageIndices = [];
+        _searchOccurrences = [];
         _currentMatchIndex = 0;
         _searchError = null;
       });
@@ -118,58 +173,131 @@ class _ChatViewState extends State<ChatView> {
     try {
       final pattern = _isRegex ? query : RegExp.escape(query);
       final regex = RegExp(pattern, caseSensitive: _isCaseSensitive);
-      final matches = <int>[];
+      final occurrences = <_SearchOccurrence>[];
       final messages = widget.state.messages;
       for (var i = 0; i < messages.length; i++) {
-        if (regex.hasMatch(messages[i].content) ||
-            (messages[i].reasoning.isNotEmpty &&
-                regex.hasMatch(messages[i].reasoning))) {
-          matches.add(i);
+        final msg = messages[i];
+        var occInMsg = 0;
+        for (final _ in regex.allMatches(msg.content)) {
+          occurrences.add(
+            _SearchOccurrence(
+              messageIndex: i,
+              messageId: msg.id,
+              occurrenceIndexInMessage: occInMsg++,
+            ),
+          );
         }
       }
 
       setState(() {
         _activeSearchPattern = regex;
-        _matchedMessageIndices = matches;
+        _searchOccurrences = occurrences;
         _currentMatchIndex = 0;
         _searchError = null;
       });
-
-      if (matches.isNotEmpty) {
-        _scrollToMessage(matches[0]);
-      }
+      _scrollToCurrentMatch();
     } catch (e) {
       setState(() {
         _activeSearchPattern = null;
-        _matchedMessageIndices = [];
+        _searchOccurrences = [];
         _currentMatchIndex = 0;
         _searchError = 'Invalid Regex';
       });
     }
   }
 
-  void _scrollToMessage(int index) {
-    final messages = widget.state.messages;
-    if (index < 0 || index >= messages.length) return;
-    final key = _messageKeys[messages[index].id];
-    final targetContext = key?.currentContext;
-    if (targetContext != null) {
-      Scrollable.ensureVisible(
-        targetContext,
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeInOut,
+  void _scrollToCurrentMatch() {
+    if (_searchOccurrences.isEmpty) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _searchOccurrences.isEmpty) return;
+      final matchIndex = _currentMatchIndex.clamp(
+        0,
+        _searchOccurrences.length - 1,
       );
-    }
+      final occ = _searchOccurrences[matchIndex];
+      final messages = widget.state.messages;
+      if (occ.messageIndex < 0 || occ.messageIndex >= messages.length) return;
+
+      final targetId = messages[occ.messageIndex].id;
+      final key = _messageKeys.putIfAbsent(targetId, () => GlobalKey());
+
+      void performScroll(BuildContext ctx) {
+        final activeKey = ValueKey(
+          'active_search_${occ.messageId}_${occ.occurrenceIndexInMessage}',
+        );
+        Element? targetEl;
+        void searchElement(Element el) {
+          if (el.widget.key == activeKey) {
+            targetEl = el;
+            return;
+          }
+          el.visitChildren(searchElement);
+        }
+
+        ctx.visitChildElements(searchElement);
+
+        final scrollTarget = targetEl ?? ctx;
+        Scrollable.ensureVisible(
+          scrollTarget,
+          alignment: 0.5,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeInOutCubic,
+        );
+      }
+
+      final targetContext = key.currentContext;
+      if (targetContext != null) {
+        performScroll(targetContext);
+        return;
+      }
+
+      if (!_scrollController.hasClients || messages.isEmpty) return;
+      final total = messages.length > 1 ? messages.length - 1 : 1;
+      final fraction = (occ.messageIndex / total).clamp(0.0, 1.0);
+      final targetOffset =
+          fraction * _scrollController.position.maxScrollExtent;
+      _scrollController.jumpTo(targetOffset);
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final retryContext = _messageKeys[targetId]?.currentContext;
+        if (retryContext != null) {
+          performScroll(retryContext);
+        }
+      });
+    });
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     final text = _promptController.text.trim();
-    if ((text.isEmpty && _stagedImages.isEmpty) || widget.state.isGenerating) {
+    if ((text.isEmpty && _stagedAttachments.isEmpty) ||
+        widget.state.isGenerating) {
       return;
     }
-    final images = List<Uint8List>.from(_stagedImages);
+
+    if (widget.state.isSearchVisible) {
+      _closeSearch();
+    }
+
+    final images = _stagedAttachments
+        .where((a) => a.type == AttachmentType.image && a.bytes != null)
+        .map((a) => a.bytes!)
+        .toList();
+
+    final pdfs = _stagedAttachments
+        .where((a) => a.type == AttachmentType.pdf)
+        .toList();
+
     _promptController.clear();
-    setState(() => _stagedImages.clear());
+    setState(() => _stagedAttachments.clear());
+
+    for (final pdf in pdfs) {
+      if (pdf.path != null) {
+        await widget.state.addPdf(pdf.path!);
+      }
+    }
+
     widget.state.sendPrompt(text, images: images);
     _scrollToBottom();
     _maintainInputFocus();
@@ -181,7 +309,16 @@ class _ChatViewState extends State<ChatView> {
     try {
       final picked = await _clipboardService.pickImage();
       if (picked != null && mounted) {
-        setState(() => _stagedImages.add(picked));
+        setState(() {
+          _stagedAttachments.add(
+            StagedAttachment(
+              id: UniqueKey().toString(),
+              type: AttachmentType.image,
+              name: 'image.png',
+              bytes: picked,
+            ),
+          );
+        });
       }
     } finally {
       _isPicking = false;
@@ -197,12 +334,28 @@ class _ChatViewState extends State<ChatView> {
       if (path == null || path.isEmpty || !mounted) {
         return;
       }
+      final filename = path.split(RegExp(r'[/\\]')).last;
       if (path.toLowerCase().endsWith('.pdf')) {
-        final res = await widget.state.addPdf(path);
-        if (mounted && res != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(res), duration: const Duration(seconds: 2)),
-          );
+        final item = StagedAttachment(
+          id: UniqueKey().toString(),
+          type: AttachmentType.pdf,
+          name: filename,
+          path: path,
+          isUploading: true,
+        );
+        setState(() => _stagedAttachments.add(item));
+        try {
+          await widget.state.addPdf(path);
+          if (mounted) {
+            setState(() => item.isUploading = false);
+          }
+        } catch (e) {
+          if (mounted) {
+            setState(() {
+              item.isUploading = false;
+              item.error = 'Failed to upload PDF';
+            });
+          }
         }
         return;
       }
@@ -227,15 +380,22 @@ class _ChatViewState extends State<ChatView> {
       _maintainInputFocus();
       return;
     }
-    setState(() => _stagedImages.add(img));
+    setState(() {
+      _stagedAttachments.add(
+        StagedAttachment(
+          id: UniqueKey().toString(),
+          type: AttachmentType.image,
+          name: 'pasted_image.png',
+          bytes: img,
+        ),
+      );
+    });
     _maintainInputFocus();
   }
 
-  void _removeStagedImage(int index) {
-    if (index < 0 || index >= _stagedImages.length) {
-      return;
-    }
-    setState(() => _stagedImages.removeAt(index));
+  void _removeStagedAttachment(int index) {
+    if (index < 0 || index >= _stagedAttachments.length) return;
+    setState(() => _stagedAttachments.removeAt(index));
     _maintainInputFocus();
   }
 
@@ -250,19 +410,48 @@ class _ChatViewState extends State<ChatView> {
     );
   }
 
+  void _openSearch() {
+    widget.state.toggleSearch(true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _searchFocusNode.requestFocus();
+      _searchController.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: _searchController.text.length,
+      );
+      if (_searchOccurrences.isNotEmpty) {
+        _scrollToCurrentMatch();
+      }
+    });
+  }
+
+  void _closeSearch() {
+    widget.state.toggleSearch(false);
+    _searchController.clear();
+    _maintainInputFocus();
+  }
+
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) {
       return KeyEventResult.ignored;
     }
-
     final isModifierActive = _isModifierPressed();
 
     if (event.logicalKey == LogicalKeyboardKey.keyF && isModifierActive) {
-      widget.state.toggleSearch(true);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _searchFocusNode.requestFocus();
-      });
+      _openSearch();
       return KeyEventResult.handled;
+    }
+
+    if (widget.state.isSearchVisible) {
+      final isShift = HardwareKeyboard.instance.isShiftPressed;
+      if (event.logicalKey == LogicalKeyboardKey.f3) {
+        if (isShift) {
+          _previousMatch();
+        } else {
+          _nextMatch();
+        }
+        return KeyEventResult.handled;
+      }
     }
 
     if (event.logicalKey == LogicalKeyboardKey.escape &&
@@ -273,8 +462,7 @@ class _ChatViewState extends State<ChatView> {
 
     if (event.logicalKey == LogicalKeyboardKey.escape &&
         widget.state.isSearchVisible) {
-      widget.state.toggleSearch(false);
-      _maintainInputFocus();
+      _closeSearch();
       return KeyEventResult.handled;
     }
 
@@ -288,8 +476,8 @@ class _ChatViewState extends State<ChatView> {
         event.logicalKey == LogicalKeyboardKey.delete;
     if (isBackspaceOrDelete &&
         _promptController.text.isEmpty &&
-        _stagedImages.isNotEmpty) {
-      _removeStagedImage(_stagedImages.length - 1);
+        _stagedAttachments.isNotEmpty) {
+      _removeStagedAttachment(_stagedAttachments.length - 1);
       return KeyEventResult.handled;
     }
 
@@ -308,7 +496,15 @@ class _ChatViewState extends State<ChatView> {
   @override
   Widget build(BuildContext context) {
     final messages = widget.state.messages;
-    _scrollToBottom();
+    if (messages.length != _lastMessageCount) {
+      final wasNewMessage = messages.length > _lastMessageCount;
+      _lastMessageCount = messages.length;
+      if (wasNewMessage && !widget.state.isSearchVisible) {
+        _scrollToBottom();
+      }
+    } else if (widget.state.isGenerating && !widget.state.isSearchVisible) {
+      _autoScrollToBottomIfAppropriate();
+    }
 
     return Focus(
       onKeyEvent: _handleKeyEvent,
@@ -336,8 +532,15 @@ class _ChatViewState extends State<ChatView> {
                     ),
                   ),
                   TextButton(
-                    onPressed: () => widget.state.initConnection(),
+                    onPressed: () => widget.state.retryLastAction(),
                     child: const Text('Retry'),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 16),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    color: AppTheme.accentPink,
+                    onPressed: () => widget.state.clearError(),
                   ),
                 ],
               ),
@@ -349,7 +552,7 @@ class _ChatViewState extends State<ChatView> {
               isRegex: _isRegex,
               isCaseSensitive: _isCaseSensitive,
               currentMatchIndex: _currentMatchIndex,
-              totalMatches: _matchedMessageIndices.length,
+              totalMatches: _searchOccurrences.length,
               searchError: _searchError,
               onToggleCaseSensitive: () {
                 setState(() => _isCaseSensitive = !_isCaseSensitive);
@@ -361,10 +564,7 @@ class _ChatViewState extends State<ChatView> {
               },
               onPreviousMatch: _previousMatch,
               onNextMatch: _nextMatch,
-              onClose: () {
-                widget.state.toggleSearch(false);
-                _maintainInputFocus();
-              },
+              onClose: _closeSearch,
               onSubmitted: (_) => _nextMatch(),
             ),
           Expanded(
@@ -372,21 +572,23 @@ class _ChatViewState extends State<ChatView> {
                 ? ChatEmptyState(
                     activeModel: widget.state.activeModel,
                     onCodeAndChat: () {
+                      if (widget.state.isSearchVisible) {
+                        _closeSearch();
+                      }
                       _promptController.text =
                           'Explain the architecture of this project.';
                       _maintainInputFocus();
                     },
                     onApplyItf: () {
+                      if (widget.state.isSearchVisible) {
+                        _closeSearch();
+                      }
                       _promptController.text =
                           'Write unified diffs for the necessary changes.';
                       _maintainInputFocus();
                     },
                     onAttachImage: _handleAttachImage,
                     onAddFileOrPdf: _handleAddFileOrPdf,
-                    onContextAndShell: () {
-                      _promptController.text = '/list';
-                      _maintainInputFocus();
-                    },
                   )
                 : ListView.builder(
                     controller: _scrollController,
@@ -401,13 +603,17 @@ class _ChatViewState extends State<ChatView> {
                         msg.id,
                         () => GlobalKey(),
                       );
-                      final isTargetMatch =
-                          _matchedMessageIndices.isNotEmpty &&
-                          _matchedMessageIndices[_currentMatchIndex] == index;
+                      final activeOcc = _searchOccurrences.isNotEmpty
+                          ? _searchOccurrences[_currentMatchIndex]
+                          : null;
+                      final isThisMsgActive = activeOcc?.messageIndex == index;
+
                       return MessageBubble(
                         key: key,
                         searchPattern: _activeSearchPattern,
-                        isSearchMatch: isTargetMatch,
+                        activeSearchOccurrence: isThisMsgActive
+                            ? activeOcc?.occurrenceIndexInMessage
+                            : null,
                         message: msg,
                         onDelete: () => widget.state.deleteMessage(msg.id),
                         onBranch: () => widget.state.branchFrom(msg.id),
@@ -442,10 +648,10 @@ class _ChatViewState extends State<ChatView> {
                     },
                   ),
           ),
-          if (_stagedImages.isNotEmpty)
-            ChatStagedImagesPreview(
-              images: _stagedImages,
-              onRemoveImage: _removeStagedImage,
+          if (_stagedAttachments.isNotEmpty)
+            StagedAttachmentsPreview(
+              attachments: _stagedAttachments,
+              onRemoveAttachment: _removeStagedAttachment,
             ),
           ChatInputBar(
             promptController: _promptController,
@@ -472,21 +678,20 @@ class _ChatViewState extends State<ChatView> {
   }
 
   void _previousMatch() {
-    if (_matchedMessageIndices.isEmpty) return;
+    if (_searchOccurrences.isEmpty) return;
     setState(() {
       _currentMatchIndex =
-          (_currentMatchIndex - 1 + _matchedMessageIndices.length) %
-          _matchedMessageIndices.length;
+          (_currentMatchIndex - 1 + _searchOccurrences.length) %
+          _searchOccurrences.length;
     });
-    _scrollToMessage(_matchedMessageIndices[_currentMatchIndex]);
+    _scrollToCurrentMatch();
   }
 
   void _nextMatch() {
-    if (_matchedMessageIndices.isEmpty) return;
+    if (_searchOccurrences.isEmpty) return;
     setState(() {
-      _currentMatchIndex =
-          (_currentMatchIndex + 1) % _matchedMessageIndices.length;
+      _currentMatchIndex = (_currentMatchIndex + 1) % _searchOccurrences.length;
     });
-    _scrollToMessage(_matchedMessageIndices[_currentMatchIndex]);
+    _scrollToCurrentMatch();
   }
 }

@@ -10,7 +10,6 @@ class ChatEmptyState extends StatelessWidget {
     required this.onApplyItf,
     required this.onAttachImage,
     required this.onAddFileOrPdf,
-    required this.onContextAndShell,
   });
 
   final String activeModel;
@@ -18,7 +17,6 @@ class ChatEmptyState extends StatelessWidget {
   final VoidCallback onApplyItf;
   final VoidCallback onAttachImage;
   final VoidCallback onAddFileOrPdf;
-  final VoidCallback onContextAndShell;
 
   @override
   Widget build(BuildContext context) {
@@ -78,13 +76,6 @@ class ChatEmptyState extends StatelessWidget {
                     desc:
                         'Add PDF documents to context for automatic page rendering with pti.',
                     onTap: onAddFileOrPdf,
-                  ),
-                  _ExploreCard(
-                    icon: Icons.terminal,
-                    title: 'Context & Shell',
-                    desc:
-                        'Add project files to context with /file and inspect with /list.',
-                    onTap: onContextAndShell,
                   ),
                 ],
               ),

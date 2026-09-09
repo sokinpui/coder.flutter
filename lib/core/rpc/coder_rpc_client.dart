@@ -11,8 +11,10 @@ class CoderRpcClient {
   final WsTransport _transport;
   final Map<int, Completer<dynamic>> _pendingRequests = {};
   NotificationCallback? onNotification;
+  void Function()? onDisconnected;
   int _requestId = 0;
   StreamSubscription? _subscription;
+  StreamSubscription? _disconnectSubscription;
 
   bool get isConnected => _transport.isConnected;
 
@@ -20,11 +22,17 @@ class CoderRpcClient {
     await _subscription?.cancel();
     await _transport.connect(serverUrl);
     _subscription = _transport.stream.listen(_handleIncomingMessage);
+    await _disconnectSubscription?.cancel();
+    _disconnectSubscription = _transport.onDisconnected.listen((_) {
+      onDisconnected?.call();
+    });
   }
 
   Future<void> disconnect() async {
     await _subscription?.cancel();
     _subscription = null;
+    await _disconnectSubscription?.cancel();
+    _disconnectSubscription = null;
     await _transport.close();
     for (final completer in _pendingRequests.values) {
       if (!completer.isCompleted) {

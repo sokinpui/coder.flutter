@@ -9,6 +9,8 @@ class IOWsTransport implements WsTransport {
   WebSocket? _socket;
   final StreamController<String> _controller =
       StreamController<String>.broadcast();
+  final StreamController<void> _disconnectController =
+      StreamController<void>.broadcast();
 
   @override
   Stream<String> get stream => _controller.stream;
@@ -16,6 +18,9 @@ class IOWsTransport implements WsTransport {
   @override
   bool get isConnected =>
       _socket != null && _socket!.readyState == WebSocket.open;
+
+  @override
+  Stream<void> get onDisconnected => _disconnectController.stream;
 
   @override
   Future<void> connect(String url) async {
@@ -34,10 +39,10 @@ class IOWsTransport implements WsTransport {
       },
       onError: (error) {
         _controller.addError(error);
-        close();
+        close(notifyDisconnect: true);
       },
       onDone: () {
-        close();
+        close(notifyDisconnect: true);
       },
       cancelOnError: false,
     );
@@ -52,11 +57,14 @@ class IOWsTransport implements WsTransport {
   }
 
   @override
-  Future<void> close() async {
+  Future<void> close({bool notifyDisconnect = false}) async {
     if (_socket == null) {
       return;
     }
     await _socket!.close();
     _socket = null;
+    if (notifyDisconnect) {
+      _disconnectController.add(null);
+    }
   }
 }

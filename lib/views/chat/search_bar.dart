@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/hover_animated_button.dart';
@@ -52,18 +53,48 @@ class ChatSearchBar extends StatelessWidget {
           const Icon(Icons.search, size: 18, color: AppTheme.textMuted),
           const SizedBox(width: 8),
           Expanded(
-            child: TextField(
-              controller: controller,
-              focusNode: focusNode,
-              style: const TextStyle(fontSize: 13),
-              decoration: const InputDecoration(
-                hintText: 'Find in conversation (supports regex)...',
-                hintStyle: TextStyle(fontSize: 13, color: AppTheme.textMuted),
-                border: InputBorder.none,
-                isDense: true,
-                contentPadding: EdgeInsets.symmetric(vertical: 6),
+            child: Focus(
+              onKeyEvent: (node, event) {
+                if (event is! KeyDownEvent) {
+                  return KeyEventResult.ignored;
+                }
+                final isShift = HardwareKeyboard.instance.isShiftPressed;
+                if (event.logicalKey == LogicalKeyboardKey.enter ||
+                    event.logicalKey == LogicalKeyboardKey.numpadEnter) {
+                  if (isShift) {
+                    onPreviousMatch();
+                  } else {
+                    onNextMatch();
+                  }
+                  return KeyEventResult.handled;
+                }
+                if (event.logicalKey == LogicalKeyboardKey.f3) {
+                  if (isShift) {
+                    onPreviousMatch();
+                  } else {
+                    onNextMatch();
+                  }
+                  return KeyEventResult.handled;
+                }
+                if (event.logicalKey == LogicalKeyboardKey.escape) {
+                  onClose();
+                  return KeyEventResult.handled;
+                }
+                return KeyEventResult.ignored;
+              },
+              child: TextField(
+                controller: controller,
+                focusNode: focusNode,
+                style: const TextStyle(fontSize: 13),
+                decoration: const InputDecoration(
+                  hintText: 'Find in conversation (supports regex)...',
+                  hintStyle: TextStyle(fontSize: 13, color: AppTheme.textMuted),
+                  border: InputBorder.none,
+                  isDense: true,
+                  contentPadding: EdgeInsets.symmetric(vertical: 6),
+                ),
+                onSubmitted: onSubmitted,
               ),
-              onSubmitted: onSubmitted,
             ),
           ),
           HoverAnimatedButton(

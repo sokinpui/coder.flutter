@@ -13,7 +13,7 @@ class MessageBubble extends StatefulWidget {
     super.key,
     required this.message,
     this.searchPattern,
-    this.isSearchMatch = false,
+    this.activeSearchOccurrence,
     this.onDelete,
     this.onRegenerate,
     this.onApplyItf,
@@ -24,7 +24,7 @@ class MessageBubble extends StatefulWidget {
 
   final ChatMessage message;
   final RegExp? searchPattern;
-  final bool isSearchMatch;
+  final int? activeSearchOccurrence;
   final VoidCallback? onDelete;
   final VoidCallback? onRegenerate;
   final Future<void> Function()? onUndoItf;
@@ -74,6 +74,9 @@ class _MessageBubbleState extends State<MessageBubble> {
 
     final isDark = theme.brightness == Brightness.dark;
     final isImageMsg = widget.message.author == MessageAuthor.image;
+    final isPdfMsg =
+        widget.message.author == MessageAuthor.pdf ||
+        widget.message.pdfPath != null;
     final isUserSide =
         widget.message.author == MessageAuthor.user ||
         widget.message.author == MessageAuthor.command ||
@@ -118,21 +121,11 @@ class _MessageBubbleState extends State<MessageBubble> {
                     : (isDark ? AppTheme.surface : AppTheme.lightSurface),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: widget.isSearchMatch
-                      ? AppTheme.accentYellow
-                      : (isUserSide
-                            ? theme.dividerColor.withOpacity(0.4)
-                            : theme.dividerColor),
-                  width: widget.isSearchMatch ? 1.8 : 1.0,
+                  color: isUserSide
+                      ? theme.dividerColor.withOpacity(0.4)
+                      : theme.dividerColor,
+                  width: 1.0,
                 ),
-                boxShadow: [
-                  if (widget.isSearchMatch)
-                    BoxShadow(
-                      color: AppTheme.accentYellow.withOpacity(0.2),
-                      blurRadius: 10,
-                      spreadRadius: 1,
-                    ),
-                ],
               ),
               child: Column(
                 crossAxisAlignment: isUserSide
@@ -141,6 +134,7 @@ class _MessageBubbleState extends State<MessageBubble> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (isImageMsg) _buildImagePayload(maxBubbleWidth),
+                  if (isPdfMsg) _buildPdfPayload(context, isDark),
                   if (widget.message.reasoning.isNotEmpty)
                     ReasoningCard(
                       reasoning: widget.message.reasoning,
@@ -148,10 +142,15 @@ class _MessageBubbleState extends State<MessageBubble> {
                     ),
                   if (_isEditing)
                     _buildInlineEditor(context, isDark)
-                  else if (!isImageMsg && widget.message.content.isNotEmpty)
+                  else if (!isImageMsg &&
+                      !isPdfMsg &&
+                      widget.message.content.isNotEmpty)
                     MarkdownRenderer(
                       content: widget.message.content,
+                      messageId: widget.message.id,
                       searchPattern: widget.searchPattern,
+                      activeSearchOccurrenceInMessage:
+                          widget.activeSearchOccurrence,
                     ),
                   if (widget.message.isGenerating)
                     const Padding(
@@ -264,6 +263,37 @@ class _MessageBubbleState extends State<MessageBubble> {
     );
   }
 
+  Widget _buildPdfPayload(BuildContext context, bool isDark) {
+    final name = widget.message.pdfName ?? widget.message.content;
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.surface : AppTheme.lightSurface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Theme.of(context).dividerColor),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.picture_as_pdf,
+            color: AppTheme.accentYellow,
+            size: 24,
+          ),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Text(
+              name,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildImagePayload(double maxWidth) {
     if (widget.message.imageData != null) {
       return ClipRRect(
@@ -301,6 +331,9 @@ class _MessageBubbleState extends State<MessageBubble> {
       case MessageAuthor.image:
         icon = Icons.image_outlined;
         color = AppTheme.primary;
+      case MessageAuthor.pdf:
+        icon = Icons.picture_as_pdf_outlined;
+        color = AppTheme.accentYellow;
       case MessageAuthor.command:
         icon = Icons.terminal;
         color = AppTheme.primary;

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../../core/services/clipboard_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../settings/context_dialog.dart';
+import '../settings/model_picker_dialog.dart';
 import '../../state/coder_state.dart';
 import 'empty_state.dart';
 import 'input_bar.dart';
@@ -238,6 +239,17 @@ class _ChatViewState extends State<ChatView> {
     _maintainInputFocus();
   }
 
+  void _openModelPicker() {
+    showDialog(
+      context: context,
+      builder: (_) => ModelPickerDialog(
+        models: widget.state.availableModels,
+        activeModel: widget.state.activeModel,
+        onModelSelected: widget.state.setModel,
+      ),
+    );
+  }
+
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) {
       return KeyEventResult.ignored;
@@ -440,6 +452,7 @@ class _ChatViewState extends State<ChatView> {
             inputFocusNode: _inputFocusNode,
             isGenerating: widget.state.isGenerating,
             activeModel: widget.state.activeModel,
+            onOpenModelPicker: _openModelPicker,
             tokenCount: widget.state.tokenCount,
             contextDocumentsCount: widget.state.contextDocuments.length,
             contextFilesCount: widget.state.contextFiles.length,

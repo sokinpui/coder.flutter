@@ -6,7 +6,6 @@ import '../../core/widgets/hover_animated_button.dart';
 import '../../state/coder_state.dart';
 import '../settings/server_settings_dialog.dart';
 import 'session_list_item.dart';
-import '../settings/context_dialog.dart';
 
 class SessionSidebar extends StatelessWidget {
   const SessionSidebar({
@@ -32,7 +31,6 @@ class SessionSidebar extends StatelessWidget {
           _buildHeader(context),
           _buildNewChatButton(context),
           _buildModelSelector(context),
-          _buildContextSection(context),
           const Divider(),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -50,62 +48,6 @@ class SessionSidebar extends StatelessWidget {
           const Divider(),
           _buildFooter(context),
         ],
-      ),
-    );
-  }
-
-  Widget _buildContextSection(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final filesCount = state.contextFiles.length;
-    final docsCount = state.contextDocuments.length;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: HoverAnimatedButton(
-        tooltip: 'Manage Project Context & Documents',
-        hoverScale: 1.02,
-        onTap: () {
-          showDialog(
-            context: context,
-            builder: (_) => ContextDialog(state: state),
-          );
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
-          decoration: BoxDecoration(
-            color: isDark
-                ? AppTheme.surfaceSubtle
-                : AppTheme.lightSurfaceSubtle,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: theme.dividerColor),
-          ),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.layers_outlined,
-                size: 16,
-                color: AppTheme.accentCyan,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Context ($filesCount files, $docsCount docs)',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const Icon(
-                Icons.chevron_right,
-                size: 16,
-                color: AppTheme.textMuted,
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

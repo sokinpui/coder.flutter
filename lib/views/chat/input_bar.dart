@@ -11,6 +11,7 @@ class ChatInputBar extends StatelessWidget {
     required this.inputFocusNode,
     required this.isGenerating,
     required this.activeModel,
+    required this.onOpenModelPicker,
     required this.tokenCount,
     required this.contextDocumentsCount,
     required this.contextFilesCount,
@@ -26,6 +27,7 @@ class ChatInputBar extends StatelessWidget {
   final FocusNode inputFocusNode;
   final bool isGenerating;
   final String activeModel;
+  final VoidCallback onOpenModelPicker;
   final int tokenCount;
   final int contextDocumentsCount;
   final int contextFilesCount;
@@ -139,34 +141,44 @@ class ChatInputBar extends StatelessWidget {
                             padding: EdgeInsets.zero,
                           ),
                           const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? AppTheme.surfaceSubtle
-                                  : AppTheme.lightSurfaceSubtle,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.memory,
-                                  size: 12,
-                                  color: AppTheme.primary,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  activeModel,
-                                  style: const TextStyle(
-                                    fontSize: 11,
+                          InkWell(
+                            onTap: onOpenModelPicker,
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? AppTheme.surfaceSubtle
+                                    : AppTheme.lightSurfaceSubtle,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.memory,
+                                    size: 12,
+                                    color: AppTheme.primary,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    activeModel,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: AppTheme.textMuted,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 2),
+                                  const Icon(
+                                    Icons.arrow_drop_down,
+                                    size: 14,
                                     color: AppTheme.textMuted,
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                           if (tokenCount > 0) ...[

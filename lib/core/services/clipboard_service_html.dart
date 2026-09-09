@@ -25,31 +25,32 @@ class HtmlClipboardService implements ClipboardService {
     final items = event.clipboardData?.items;
     if (items == null) return;
 
-    for (var i = 0; i < items.length; i++) {
+    final itemCount = items.length ?? 0;
+    for (var i = 0; i < itemCount; i++) {
       final item = items[i];
-      if (item.type != null && item.type!.startsWith('image/')) {
-        final blob = item.getAsFile();
-        if (blob == null) continue;
+      if (item == null) continue;
+      if (item.type == null || !item.type!.startsWith('image/')) continue;
+      final blob = item.getAsFile();
+      if (blob == null) continue;
 
-        final reader = html.FileReader();
-        reader.onLoadEnd.listen((_) {
-          final result = reader.result;
-          if (result is Uint8List) {
-            _lastPastedImage = result;
-            _imageStreamController.add(result);
-          } else if (result is String) {
-            final comma = result.indexOf(',');
-            if (comma != -1) {
-              final bytes = base64Decode(result.substring(comma + 1));
-              _lastPastedImage = bytes;
-              _imageStreamController.add(bytes);
-            }
+      final reader = html.FileReader();
+      reader.onLoadEnd.listen((_) {
+        final result = reader.result;
+        if (result is Uint8List) {
+          _lastPastedImage = result;
+          _imageStreamController.add(result);
+        } else if (result is String) {
+          final comma = result.indexOf(',');
+          if (comma != -1) {
+            final bytes = base64Decode(result.substring(comma + 1));
+            _lastPastedImage = bytes;
+            _imageStreamController.add(bytes);
           }
-        });
-        reader.readAsArrayBuffer(blob);
-        event.preventDefault();
-        break;
-      }
+        }
+      });
+      reader.readAsArrayBuffer(blob);
+      event.preventDefault();
+      break;
     }
   }
 

@@ -609,12 +609,15 @@ class _ChatViewState extends State<ChatView> {
   }
 
   Widget _buildStagedImagePreview() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: const BoxDecoration(
-        color: AppTheme.surface,
-        border: Border(top: BorderSide(color: AppTheme.border)),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.surface : AppTheme.lightSurface,
+        border: Border(top: BorderSide(color: theme.dividerColor)),
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -782,7 +785,7 @@ class _ChatViewState extends State<ChatView> {
                         const SizedBox(width: 4),
                         Text(
                           '≈${widget.state.tokenCount}',
-                          style: const TextStyle(
+                          style: AppTheme.monoTextStyle(
                             fontSize: 11,
                             color: AppTheme.textMuted,
                           ),

@@ -22,7 +22,7 @@ class CoderState extends ChangeNotifier {
   String _serverHost = '127.0.0.1';
   int _serverPort = 9005;
   bool _useTls = kIsWeb && Uri.base.scheme == 'https';
-  ThemeMode _themeMode = ThemeMode.dark;
+  ThemeMode _themeMode = ThemeMode.light;
   bool _isSidebarVisible = true;
   String _activeModel = 'default';
   String _sessionTitle = 'New Chat';
@@ -73,7 +73,7 @@ class CoderState extends ChangeNotifier {
     }
     final modeStr = settings['themeMode'] as String?;
     if (modeStr != null) {
-      _themeMode = modeStr == 'light' ? ThemeMode.light : ThemeMode.dark;
+      _themeMode = modeStr == 'dark' ? ThemeMode.dark : ThemeMode.light;
     }
     final isSidebar = settings['isSidebarVisible'] as bool?;
     if (isSidebar != null) {

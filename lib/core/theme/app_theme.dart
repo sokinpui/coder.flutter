@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class AppTheme {
   static const Color background = Color(0xFF0F1218);
@@ -19,6 +21,75 @@ class AppTheme {
   static const Color accentPink = Color(0xFFFF7B72);
   static const Color textMain = Color(0xFFF0F6FC);
   static const Color textMuted = Color(0xFF8B949E);
+
+  static const List<String> monoFontFamilyFallback = [
+    'CoderMono',
+    'packages/flutter_math_fork/KaTeX_Typewriter',
+    'KaTeX_Typewriter',
+    'SF Mono',
+    'Menlo',
+    'Cascadia Code',
+    'Consolas',
+    'DejaVu Sans Mono',
+    'Liberation Mono',
+    'Courier New',
+    'monospace',
+  ];
+
+  static String get monoFontFamily {
+    if (kIsWeb) {
+      return 'CoderMono';
+    }
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.macOS:
+      case TargetPlatform.iOS:
+        return 'Menlo';
+      case TargetPlatform.windows:
+        return 'Consolas';
+      case TargetPlatform.linux:
+        return 'DejaVu Sans Mono';
+      default:
+        return 'CoderMono';
+    }
+  }
+
+  static Future<void> initializeFonts() async {
+    try {
+      final fontLoader = FontLoader('CoderMono');
+      final byteData = await rootBundle.load(
+        'packages/flutter_math_fork/lib/katex_fonts/fonts/KaTeX_Typewriter-Regular.ttf',
+      );
+      fontLoader.addFont(Future.value(byteData));
+      await fontLoader.load();
+    } catch (_) {
+      try {
+        final fontLoader = FontLoader('CoderMono');
+        final byteData = await rootBundle.load(
+          'packages/flutter_math_fork/katex_fonts/fonts/KaTeX_Typewriter-Regular.ttf',
+        );
+        fontLoader.addFont(Future.value(byteData));
+        await fontLoader.load();
+      } catch (_) {}
+    }
+  }
+
+  static TextStyle monoTextStyle({
+    double? fontSize,
+    FontWeight? fontWeight,
+    Color? color,
+    Color? backgroundColor,
+    double? height,
+  }) {
+    return TextStyle(
+      fontFamily: monoFontFamily,
+      fontFamilyFallback: monoFontFamilyFallback,
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color,
+      backgroundColor: backgroundColor,
+      height: height,
+    );
+  }
 
   static ThemeData darkTheme() {
     return ThemeData(

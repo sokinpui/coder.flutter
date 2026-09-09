@@ -45,6 +45,15 @@ class MarkdownRenderer extends StatelessWidget {
             : MarkdownConfig.defaultConfig)
         .copy(
       configs: [
+        CodeConfig(
+          style: AppTheme.monoTextStyle(
+            fontSize: 13.0,
+            color: isDark ? const Color(0xFFFF7B72) : const Color(0xFFCF222E),
+            backgroundColor: isDark
+                ? const Color(0x266E7681)
+                : const Color(0x1A1F2328),
+          ),
+        ),
         PConfig(
           textStyle: TextStyle(
             fontSize: 13.5,
@@ -195,7 +204,8 @@ class LatexNode extends SpanNode {
       onErrorFallback: (err) => Text(
         isInline ? '\$$content\$' : '\$\$\n$content\n\$\$',
         style: style.copyWith(
-          fontFamily: 'monospace',
+          fontFamily: AppTheme.monoFontFamily,
+          fontFamilyFallback: AppTheme.monoFontFamilyFallback,
           color: AppTheme.accentPink,
         ),
       ),

@@ -4,8 +4,9 @@ import 'core/theme/app_theme.dart';
 import 'state/coder_state.dart';
 import 'views/responsive_home.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AppTheme.initializeFonts();
   runApp(const MyApp());
 }
 

@@ -366,10 +366,9 @@ class _MessageBubbleState extends State<MessageBubble> {
         Flexible(
           child: Text(
             widget.message.imagePath ?? 'Image',
-            style: const TextStyle(
+            style: AppTheme.monoTextStyle(
               color: AppTheme.textMuted,
               fontSize: 12,
-              fontFamily: 'monospace',
             ),
           ),
         ),
@@ -397,6 +396,7 @@ class _MessageBubbleState extends State<MessageBubble> {
   }
 
   Widget _buildReasoningBlock() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Theme(
@@ -406,8 +406,10 @@ class _MessageBubbleState extends State<MessageBubble> {
             borderRadius: BorderRadius.circular(8),
           ),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          backgroundColor: AppTheme.background,
-          collapsedBackgroundColor: AppTheme.background.withOpacity(0.7),
+          backgroundColor: isDark ? AppTheme.background : AppTheme.lightSurfaceSubtle,
+          collapsedBackgroundColor: isDark
+              ? AppTheme.background.withOpacity(0.7)
+              : AppTheme.lightSurfaceSubtle.withOpacity(0.7),
           tilePadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
           title: const Row(
             children: [
@@ -432,10 +434,9 @@ class _MessageBubbleState extends State<MessageBubble> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: SelectableText(
                 widget.message.reasoning,
-                style: const TextStyle(
+                style: AppTheme.monoTextStyle(
                   color: AppTheme.textMuted,
                   fontSize: 12,
-                  fontFamily: 'monospace',
                   height: 1.4,
                 ),
               ),

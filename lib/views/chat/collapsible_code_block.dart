@@ -99,13 +99,11 @@ class _CollapsibleCodeBlockState extends State<CollapsibleCodeBlock> {
                     const SizedBox(width: 8),
                     Text(
                       label,
-                      style: TextStyle(
+                      style: AppTheme.monoTextStyle(
                         color: isDark
                             ? const Color(0xFFC9D1D9)
                             : const Color(0xFF24292F),
                         fontSize: 12,
-                        fontFamily: 'monospace',
-                        fontFamilyFallback: CodeHighlighter.fontFallbacks,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -113,10 +111,9 @@ class _CollapsibleCodeBlockState extends State<CollapsibleCodeBlock> {
                       const SizedBox(width: 8),
                       Text(
                         '($_lineCount lines hidden)',
-                        style: const TextStyle(
+                        style: AppTheme.monoTextStyle(
                           color: AppTheme.textMuted,
                           fontSize: 11.5,
-                          fontFamily: 'monospace',
                         ),
                       ),
                     ],

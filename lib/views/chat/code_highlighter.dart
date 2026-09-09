@@ -3,14 +3,10 @@ import 'package:flutter_highlight/themes/atom-one-dark.dart';
 import 'package:flutter_highlight/themes/github.dart';
 import 'package:highlight/highlight.dart' as hl;
 
+import '../../core/theme/app_theme.dart';
+
 class CodeHighlighter {
-  static const List<String> fontFallbacks = [
-    'Menlo',
-    'Consolas',
-    'DejaVu Sans Mono',
-    'Courier New',
-    'monospace',
-  ];
+  static List<String> get fontFallbacks => AppTheme.monoFontFamilyFallback;
 
   static String expandTabs(String code, {int tabSize = 4}) {
     final buffer = StringBuffer();
@@ -42,13 +38,14 @@ class CodeHighlighter {
     String language, {
     required bool isDark,
     RegExp? searchPattern,
+    double fontSize = 14.0,
   }) {
     final code = expandTabs(rawCode);
     final normalizedLang = language.trim().toLowerCase();
 
     final TextSpan baseSpan;
     if (_isDiffLanguage(normalizedLang)) {
-      baseSpan = _highlightDiff(code, isDark);
+      baseSpan = _highlightDiff(code, isDark, fontSize: fontSize);
     } else {
       final theme = isDark ? atomOneDarkTheme : githubTheme;
       final fallbackColor = isDark
@@ -57,11 +54,9 @@ class CodeHighlighter {
       final spans = _parseHighlight(code, normalizedLang, theme);
 
       baseSpan = TextSpan(
-        style: TextStyle(
-          fontFamily: 'monospace',
-          fontFamilyFallback: fontFallbacks,
-          fontSize: 12.5,
-          height: 1.45,
+        style: AppTheme.monoTextStyle(
+          fontSize: fontSize,
+          height: 1.5,
           color: fallbackColor,
         ),
         children: spans,
@@ -122,7 +117,11 @@ class CodeHighlighter {
     return spans;
   }
 
-  static TextSpan _highlightDiff(String code, bool isDark) {
+  static TextSpan _highlightDiff(
+    String code,
+    bool isDark, {
+    double fontSize = 14.0,
+  }) {
     final lines = code.split('\n');
     final children = <TextSpan>[];
 
@@ -168,23 +167,19 @@ class CodeHighlighter {
       children.add(
         TextSpan(
           text: lineText,
-          style: TextStyle(
+          style: AppTheme.monoTextStyle(
             color: color,
             backgroundColor: background,
             fontWeight: weight,
-            fontFamily: 'monospace',
-            fontFamilyFallback: fontFallbacks,
           ),
         ),
       );
     }
 
     return TextSpan(
-      style: TextStyle(
-        fontFamily: 'monospace',
-        fontFamilyFallback: fontFallbacks,
-        fontSize: 12.5,
-        height: 1.45,
+      style: AppTheme.monoTextStyle(
+        fontSize: fontSize,
+        height: 1.5,
         color: plainColor,
       ),
       children: children,
@@ -211,7 +206,7 @@ class CodeHighlighter {
         }
         newChildren.add(TextSpan(
           text: match.group(0),
-          style: (span.style ?? const TextStyle()).copyWith(
+          style: (span.style ?? AppTheme.monoTextStyle()).copyWith(
             backgroundColor: const Color(0x66F2CC60),
             color: isDark ? const Color(0xFFFFF1A8) : const Color(0xFF5A4300),
             fontWeight: FontWeight.bold,

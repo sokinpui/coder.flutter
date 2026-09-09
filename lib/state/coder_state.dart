@@ -27,6 +27,7 @@ class CoderState extends ChangeNotifier {
   String _activeModel = 'default';
   String _sessionTitle = 'New Chat';
   List<String> _availableModels = [];
+  bool _isSearchVisible = false;
   List<SessionInfo> _historySessions = [];
   final List<ChatMessage> _messages = [];
 
@@ -39,6 +40,7 @@ class CoderState extends ChangeNotifier {
   int get serverPort => _serverPort;
   bool get useTls => _useTls;
   ThemeMode get themeMode => _themeMode;
+  bool get isSearchVisible => _isSearchVisible;
   bool get isSidebarVisible => _isSidebarVisible;
   String get activeModel => _activeModel;
   String get sessionTitle => _sessionTitle;
@@ -108,6 +110,13 @@ class CoderState extends ChangeNotifier {
     _isSidebarVisible = !_isSidebarVisible;
     notifyListeners();
     _persistSettings();
+  }
+
+  void toggleSearch([bool? visible]) {
+    final next = visible ?? !_isSearchVisible;
+    if (_isSearchVisible == next) return;
+    _isSearchVisible = next;
+    notifyListeners();
   }
 
   Future<void> updateServerAddress(

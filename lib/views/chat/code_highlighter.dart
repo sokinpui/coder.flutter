@@ -41,30 +41,37 @@ class CodeHighlighter {
     String rawCode,
     String language, {
     required bool isDark,
+    RegExp? searchPattern,
   }) {
     final code = expandTabs(rawCode);
     final normalizedLang = language.trim().toLowerCase();
 
+    final TextSpan baseSpan;
     if (_isDiffLanguage(normalizedLang)) {
-      return _highlightDiff(code, isDark);
+      baseSpan = _highlightDiff(code, isDark);
+    } else {
+      final theme = isDark ? atomOneDarkTheme : githubTheme;
+      final fallbackColor = isDark
+          ? const Color(0xFFE6EDF3)
+          : const Color(0xFF24292F);
+      final spans = _parseHighlight(code, normalizedLang, theme);
+
+      baseSpan = TextSpan(
+        style: TextStyle(
+          fontFamily: 'monospace',
+          fontFamilyFallback: fontFallbacks,
+          fontSize: 12.5,
+          height: 1.45,
+          color: fallbackColor,
+        ),
+        children: spans,
+      );
     }
 
-    final theme = isDark ? atomOneDarkTheme : githubTheme;
-    final fallbackColor = isDark
-        ? const Color(0xFFE6EDF3)
-        : const Color(0xFF24292F);
-    final spans = _parseHighlight(code, normalizedLang, theme);
-
-    return TextSpan(
-      style: TextStyle(
-        fontFamily: 'monospace',
-        fontFamilyFallback: fontFallbacks,
-        fontSize: 12.5,
-        height: 1.45,
-        color: fallbackColor,
-      ),
-      children: spans,
-    );
+    if (searchPattern == null) {
+      return baseSpan;
+    }
+    return _applySearchHighlight(baseSpan, searchPattern, isDark);
   }
 
   static bool _isDiffLanguage(String lang) {
@@ -182,5 +189,58 @@ class CodeHighlighter {
       ),
       children: children,
     );
+  }
+
+  static TextSpan _applySearchHighlight(
+    TextSpan span,
+    RegExp pattern,
+    bool isDark,
+  ) {
+    final text = span.text;
+    final children = span.children;
+
+    if (text != null && text.isNotEmpty && pattern.hasMatch(text)) {
+      final newChildren = <InlineSpan>[];
+      var lastEnd = 0;
+      for (final match in pattern.allMatches(text)) {
+        if (match.start > lastEnd) {
+          newChildren.add(TextSpan(
+            text: text.substring(lastEnd, match.start),
+            style: span.style,
+          ));
+        }
+        newChildren.add(TextSpan(
+          text: match.group(0),
+          style: (span.style ?? const TextStyle()).copyWith(
+            backgroundColor: const Color(0x66F2CC60),
+            color: isDark ? const Color(0xFFFFF1A8) : const Color(0xFF5A4300),
+            fontWeight: FontWeight.bold,
+          ),
+        ));
+        lastEnd = match.end;
+      }
+      if (lastEnd < text.length) {
+        newChildren.add(TextSpan(
+          text: text.substring(lastEnd),
+          style: span.style,
+        ));
+      }
+      return TextSpan(
+        style: span.style,
+        children: newChildren,
+      );
+    }
+
+    if (children != null && children.isNotEmpty) {
+      final newChildren = children.map((child) {
+        if (child is TextSpan) {
+          return _applySearchHighlight(child, pattern, isDark);
+        }
+        return child;
+      }).toList();
+      return TextSpan(style: span.style, children: newChildren);
+    }
+
+    return span;
   }
 }

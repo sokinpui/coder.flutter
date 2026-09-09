@@ -19,10 +19,20 @@ class ChatView extends StatefulWidget {
 }
 
 class _ChatViewState extends State<ChatView> {
+  final Map<String, GlobalKey> _messageKeys = {};
   final TextEditingController _promptController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _inputFocusNode = FocusNode();
+  final FocusNode _searchFocusNode = FocusNode();
   final ClipboardService _clipboardService = ClipboardService.create();
+
+  bool _isRegex = false;
+  bool _isCaseSensitive = false;
+  int _currentMatchIndex = 0;
+  List<int> _matchedMessageIndices = [];
+  RegExp? _activeSearchPattern;
+  String? _searchError;
   final List<Uint8List> _stagedImages = [];
   StreamSubscription<Uint8List>? _pastedImageSub;
 
@@ -61,11 +71,14 @@ class _ChatViewState extends State<ChatView> {
       setState(() => _stagedImages.add(bytes));
       _maintainInputFocus();
     });
+    _searchController.addListener(_onSearchChanged);
   }
 
   @override
   void dispose() {
     _promptController.dispose();
+    _searchController.dispose();
+    _searchFocusNode.dispose();
     _pastedImageSub?.cancel();
     _scrollController.dispose();
     _inputFocusNode.dispose();
@@ -90,6 +103,65 @@ class _ChatViewState extends State<ChatView> {
         );
       }
     });
+  }
+
+  void _onSearchChanged() {
+    final query = _searchController.text;
+    if (query.isEmpty) {
+      setState(() {
+        _activeSearchPattern = null;
+        _matchedMessageIndices = [];
+        _currentMatchIndex = 0;
+        _searchError = null;
+      });
+      return;
+    }
+
+    try {
+      final pattern = _isRegex ? query : RegExp.escape(query);
+      final regex = RegExp(pattern, caseSensitive: _isCaseSensitive);
+      final matches = <int>[];
+      final messages = widget.state.messages;
+      for (var i = 0; i < messages.length; i++) {
+        if (regex.hasMatch(messages[i].content) ||
+            (messages[i].reasoning.isNotEmpty &&
+                regex.hasMatch(messages[i].reasoning))) {
+          matches.add(i);
+        }
+      }
+
+      setState(() {
+        _activeSearchPattern = regex;
+        _matchedMessageIndices = matches;
+        _currentMatchIndex = 0;
+        _searchError = null;
+      });
+
+      if (matches.isNotEmpty) {
+        _scrollToMessage(matches[0]);
+      }
+    } catch (e) {
+      setState(() {
+        _activeSearchPattern = null;
+        _matchedMessageIndices = [];
+        _currentMatchIndex = 0;
+        _searchError = 'Invalid Regex';
+      });
+    }
+  }
+
+  void _scrollToMessage(int index) {
+    final messages = widget.state.messages;
+    if (index < 0 || index >= messages.length) return;
+    final key = _messageKeys[messages[index].id];
+    final targetContext = key?.currentContext;
+    if (targetContext != null) {
+      Scrollable.ensureVisible(
+        targetContext,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   void _submit() {
@@ -134,13 +206,28 @@ class _ChatViewState extends State<ChatView> {
       return KeyEventResult.ignored;
     }
 
+    final isModifierActive = _isModifierPressed();
+
+    if (event.logicalKey == LogicalKeyboardKey.keyF && isModifierActive) {
+      widget.state.toggleSearch(true);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _searchFocusNode.requestFocus();
+      });
+      return KeyEventResult.handled;
+    }
+
     if (event.logicalKey == LogicalKeyboardKey.escape &&
         widget.state.isGenerating) {
       widget.state.cancelGeneration();
       return KeyEventResult.handled;
     }
 
-    final isModifierActive = _isModifierPressed();
+    if (event.logicalKey == LogicalKeyboardKey.escape &&
+        widget.state.isSearchVisible) {
+      widget.state.toggleSearch(false);
+      _maintainInputFocus();
+      return KeyEventResult.handled;
+    }
 
     if (event.logicalKey == LogicalKeyboardKey.keyV && isModifierActive) {
       _pasteClipboardImage();
@@ -196,6 +283,7 @@ class _ChatViewState extends State<ChatView> {
                 ],
               ),
             ),
+          if (widget.state.isSearchVisible) _buildSearchBar(),
           Expanded(
             child: messages.isEmpty
                 ? _buildEmptyState()
@@ -208,7 +296,16 @@ class _ChatViewState extends State<ChatView> {
                     itemCount: messages.length,
                     itemBuilder: (context, index) {
                       final msg = messages[index];
+                      final key = _messageKeys.putIfAbsent(
+                        msg.id,
+                        () => GlobalKey(),
+                      );
+                      final isTargetMatch = _matchedMessageIndices.isNotEmpty &&
+                          _matchedMessageIndices[_currentMatchIndex] == index;
                       return MessageBubble(
+                        key: key,
+                        searchPattern: _activeSearchPattern,
+                        isSearchMatch: isTargetMatch,
                         message: msg,
                         onDelete: () => widget.state.deleteMessage(msg.id),
                         onBranch: () => widget.state.branchFrom(msg.id),
@@ -234,6 +331,137 @@ class _ChatViewState extends State<ChatView> {
           ),
           if (_stagedImages.isNotEmpty) _buildStagedImagePreview(),
           _buildInputBar(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final hasMatches = _matchedMessageIndices.isNotEmpty;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.surfaceSubtle : AppTheme.lightSurfaceSubtle,
+        border: Border(bottom: BorderSide(color: theme.dividerColor)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.search, size: 18, color: AppTheme.textMuted),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              focusNode: _searchFocusNode,
+              style: const TextStyle(fontSize: 13),
+              decoration: InputDecoration(
+                hintText: 'Find in conversation (supports regex)...',
+                hintStyle: const TextStyle(fontSize: 13, color: AppTheme.textMuted),
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 6),
+              ),
+              onSubmitted: (_) {
+                if (!hasMatches) return;
+                setState(() {
+                  _currentMatchIndex =
+                      (_currentMatchIndex + 1) % _matchedMessageIndices.length;
+                });
+                _scrollToMessage(_matchedMessageIndices[_currentMatchIndex]);
+              },
+            ),
+          ),
+          HoverAnimatedButton(
+            tooltip: 'Match Case (Alt+C)',
+            hoverScale: 1.1,
+            onTap: () {
+              setState(() => _isCaseSensitive = !_isCaseSensitive);
+              _onSearchChanged();
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              decoration: BoxDecoration(
+                color: _isCaseSensitive ? AppTheme.primary.withOpacity(0.2) : Colors.transparent,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                'Aa',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: _isCaseSensitive ? AppTheme.primary : AppTheme.textMuted,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          HoverAnimatedButton(
+            tooltip: 'Use Regular Expression (Alt+R)',
+            hoverScale: 1.1,
+            onTap: () {
+              setState(() => _isRegex = !_isRegex);
+              _onSearchChanged();
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              decoration: BoxDecoration(
+                color: _isRegex ? AppTheme.primary.withOpacity(0.2) : Colors.transparent,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                '.*',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: _isRegex ? AppTheme.primary : AppTheme.textMuted,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            _searchError ??
+                (_searchController.text.isEmpty
+                    ? ''
+                    : (hasMatches
+                        ? '${_currentMatchIndex + 1} of ${_matchedMessageIndices.length}'
+                        : 'No results')),
+            style: TextStyle(
+              fontSize: 11.5,
+              color: _searchError != null ? AppTheme.accentPink : AppTheme.textMuted,
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.arrow_upward, size: 16),
+            tooltip: 'Previous match (Shift+Enter)',
+            onPressed: !hasMatches ? null : () {
+              setState(() {
+                _currentMatchIndex = (_currentMatchIndex - 1 + _matchedMessageIndices.length) %
+                    _matchedMessageIndices.length;
+              });
+              _scrollToMessage(_matchedMessageIndices[_currentMatchIndex]);
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.arrow_downward, size: 16),
+            tooltip: 'Next match (Enter)',
+            onPressed: !hasMatches ? null : () {
+              setState(() {
+                _currentMatchIndex = (_currentMatchIndex + 1) % _matchedMessageIndices.length;
+              });
+              _scrollToMessage(_matchedMessageIndices[_currentMatchIndex]);
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 16),
+            tooltip: 'Close (Esc)',
+            onPressed: () {
+              widget.state.toggleSearch(false);
+              _maintainInputFocus();
+            },
+          ),
         ],
       ),
     );

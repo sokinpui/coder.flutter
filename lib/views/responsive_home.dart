@@ -64,6 +64,11 @@ class ResponsiveHome extends StatelessWidget {
         ),
         actions: [
           IconButton(
+            icon: Icon(state.isSearchVisible ? Icons.search_off : Icons.search),
+            tooltip: 'Find in chat (Cmd+F / Ctrl+F)',
+            onPressed: state.toggleSearch,
+          ),
+          IconButton(
             icon: Icon(
               isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
             ),
@@ -166,6 +171,11 @@ class ResponsiveHome extends StatelessWidget {
                 ),
               ),
             ),
+          ),
+          IconButton(
+            icon: Icon(state.isSearchVisible ? Icons.search_off : Icons.search),
+            tooltip: 'Find in chat (Cmd+F / Ctrl+F)',
+            onPressed: state.toggleSearch,
           ),
           IconButton(
             icon: Icon(

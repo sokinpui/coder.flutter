@@ -11,6 +11,8 @@ class MessageBubble extends StatefulWidget {
   const MessageBubble({
     super.key,
     required this.message,
+    this.searchPattern,
+    this.isSearchMatch = false,
     this.onDelete,
     this.onRegenerate,
     this.onApplyItf,
@@ -19,6 +21,8 @@ class MessageBubble extends StatefulWidget {
   });
 
   final ChatMessage message;
+  final RegExp? searchPattern;
+  final bool isSearchMatch;
   final VoidCallback? onDelete;
   final VoidCallback? onRegenerate;
   final Future<void> Function(String content)? onApplyItf;
@@ -92,10 +96,21 @@ class _MessageBubbleState extends State<MessageBubble> {
                     : (isDark ? AppTheme.surface : AppTheme.lightSurface),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: isUserSide
-                      ? theme.dividerColor.withOpacity(0.4)
-                      : theme.dividerColor,
+                  color: widget.isSearchMatch
+                      ? AppTheme.accentYellow
+                      : (isUserSide
+                          ? theme.dividerColor.withOpacity(0.4)
+                          : theme.dividerColor),
+                  width: widget.isSearchMatch ? 1.8 : 1.0,
                 ),
+                boxShadow: [
+                  if (widget.isSearchMatch)
+                    BoxShadow(
+                      color: AppTheme.accentYellow.withOpacity(0.2),
+                      blurRadius: 10,
+                      spreadRadius: 1,
+                    ),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -107,7 +122,11 @@ class _MessageBubbleState extends State<MessageBubble> {
                     _buildInlineEditor(context, isDark)
                   else if (!isImageMsg &&
                       widget.message.content.isNotEmpty) ...[
-                    MarkdownRenderer(content: widget.message.content),
+                    MarkdownRenderer(
+                      content: widget.message.content,
+                      searchPattern: widget.searchPattern,
+                      isStreaming: widget.message.isGenerating,
+                    ),
                     if (widget.message.isGenerating)
                       const Padding(
                         padding: EdgeInsets.only(top: 6),

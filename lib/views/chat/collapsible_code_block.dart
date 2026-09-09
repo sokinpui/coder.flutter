@@ -10,10 +10,12 @@ class CollapsibleCodeBlock extends StatefulWidget {
     super.key,
     required this.language,
     required this.code,
+    this.searchPattern,
   });
 
   final String language;
   final String code;
+  final RegExp? searchPattern;
 
   @override
   State<CollapsibleCodeBlock> createState() => _CollapsibleCodeBlockState();
@@ -154,6 +156,7 @@ class _CollapsibleCodeBlockState extends State<CollapsibleCodeBlock> {
                   widget.code,
                   widget.language,
                   isDark: isDark,
+                  searchPattern: widget.searchPattern,
                 ),
               ),
             ),

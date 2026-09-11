@@ -8,6 +8,8 @@ enum MessageAuthor {
   command,
   commandResult,
   commandError,
+  toolCall,
+  toolResult,
 }
 
 class ChatMessage {
@@ -20,6 +22,8 @@ class ChatMessage {
     this.pdfPath,
     this.pdfName,
     this.imageData,
+    this.toolName,
+    this.callId,
     this.isGenerating = false,
   });
 
@@ -31,5 +35,7 @@ class ChatMessage {
   final String? pdfPath;
   final String? pdfName;
   final Uint8List? imageData;
+  final String? toolName;
+  final String? callId;
   bool isGenerating;
 }

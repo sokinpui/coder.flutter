@@ -35,7 +35,9 @@ class MessageActionBar extends StatelessWidget {
   bool get _isCommand =>
       message.author == MessageAuthor.command ||
       message.author == MessageAuthor.commandResult ||
-      message.author == MessageAuthor.commandError;
+      message.author == MessageAuthor.commandError ||
+      message.author == MessageAuthor.toolCall ||
+      message.author == MessageAuthor.toolResult;
 
   void _confirmDelete(BuildContext context) {
     showDialog(

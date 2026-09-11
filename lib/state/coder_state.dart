@@ -355,9 +355,14 @@ class CoderState extends ChangeNotifier {
       await _client.request('session/cancel');
     } catch (_) {}
     _isGenerating = false;
+    for (final m in _messages) {
+      m.isGenerating = false;
+    }
     if (_messages.isNotEmpty &&
-        _messages.last.author == MessageAuthor.assistant) {
-      _messages.last.isGenerating = false;
+        _messages.last.author == MessageAuthor.assistant &&
+        _messages.last.content.isEmpty &&
+        _messages.last.reasoning.isEmpty) {
+      _messages.removeLast();
     }
     notifyListeners();
   }
@@ -406,7 +411,9 @@ class CoderState extends ChangeNotifier {
 
     final targetMsg = _messages[index];
     int promptMsgIndex = -1;
-    if (targetMsg.author == MessageAuthor.assistant) {
+    if (targetMsg.author == MessageAuthor.assistant ||
+        targetMsg.author == MessageAuthor.toolCall ||
+        targetMsg.author == MessageAuthor.toolResult) {
       for (var i = index - 1; i >= 0; i--) {
         if (_messages[i].author == MessageAuthor.user) {
           promptMsgIndex = i;
@@ -533,6 +540,8 @@ class CoderState extends ChangeNotifier {
 
       final isImage = typeInt == 7;
       final isAssistant = typeInt == 1;
+      final isToolCall = typeInt == 20;
+      final isToolResult = typeInt == 21;
 
       Uint8List? imgData;
       if (isImage && m['Data'] is String && (m['Data'] as String).isNotEmpty) {
@@ -541,11 +550,18 @@ class CoderState extends ChangeNotifier {
         } catch (_) {}
       }
 
+      final callId = m['call_id'] as String? ?? m['CallID'] as String?;
+      final toolName = m['tool_name'] as String? ?? m['ToolName'] as String?;
+
       MessageAuthor author;
       if (isImage) {
         author = MessageAuthor.image;
       } else if (isAssistant) {
         author = MessageAuthor.assistant;
+      } else if (isToolCall) {
+        author = MessageAuthor.toolCall;
+      } else if (isToolResult) {
+        author = MessageAuthor.toolResult;
       } else if (typeInt == 2 ||
           typeInt == 10 ||
           typeInt == 12 ||
@@ -571,6 +587,8 @@ class CoderState extends ChangeNotifier {
           content: content,
           imagePath: isImage ? content : null,
           imageData: imgData,
+          toolName: toolName,
+          callId: callId,
         ),
       );
     }
@@ -790,19 +808,75 @@ class CoderState extends ChangeNotifier {
       final done = params['done'] as bool? ?? false;
       final tokenCount = (params['tokenCount'] as num?)?.toInt();
       final error = params['error'] as String?;
+      final toolCall = params['toolCall'] as Map?;
+      final toolResult = params['toolResult'] as Map?;
 
-      if (_messages.isNotEmpty &&
-          _messages.last.author == MessageAuthor.assistant) {
+      if (toolCall != null) {
+        final callId = toolCall['call_id']?.toString();
+        final name = toolCall['name']?.toString() ?? 'tool';
+        final args = toolCall['arguments']?.toString() ?? '';
+
+        if (_messages.isNotEmpty &&
+            _messages.last.author == MessageAuthor.assistant &&
+            _messages.last.content.isEmpty &&
+            _messages.last.reasoning.isEmpty) {
+          _messages.removeLast();
+        }
+
+        _messages.add(
+          ChatMessage(
+            id: UniqueKey().toString(),
+            author: MessageAuthor.toolCall,
+            content: args,
+            toolName: name,
+            callId: callId,
+            isGenerating: true,
+          ),
+        );
+      }
+
+      if (toolResult != null) {
+        final callId = toolResult['call_id']?.toString();
+        final name = toolResult['name']?.toString() ?? 'tool';
+        final output = toolResult['output']?.toString() ?? '';
+
+        for (var i = _messages.length - 1; i >= 0; i--) {
+          if (_messages[i].author == MessageAuthor.toolCall) {
+            _messages[i].isGenerating = false;
+            break;
+          }
+        }
+
+        _messages.add(
+          ChatMessage(
+            id: UniqueKey().toString(),
+            author: MessageAuthor.toolResult,
+            content: output,
+            toolName: name,
+            callId: callId,
+          ),
+        );
+      }
+
+      if (content.isNotEmpty || reasoning.isNotEmpty) {
+        if (_messages.isEmpty ||
+            _messages.last.author != MessageAuthor.assistant) {
+          _messages.add(
+            ChatMessage(
+              id: UniqueKey().toString(),
+              author: MessageAuthor.assistant,
+              content: '',
+              reasoning: '',
+              isGenerating: true,
+            ),
+          );
+        }
         final last = _messages.last;
         if (content.isNotEmpty) {
           last.content += content;
         }
         if (reasoning.isNotEmpty) {
           last.reasoning += reasoning;
-        }
-        if (error != null && error.isNotEmpty) {
-          last.content += '\n\n[Error: $error]';
-          last.isGenerating = false;
         }
       }
 
@@ -811,9 +885,33 @@ class CoderState extends ChangeNotifier {
         if (tokenCount != null && tokenCount > 0) {
           _tokenCount = tokenCount;
         }
+        for (final m in _messages) {
+          m.isGenerating = false;
+        }
+        if (_messages.isNotEmpty &&
+            _messages.last.author == MessageAuthor.assistant &&
+            _messages.last.content.isEmpty &&
+            _messages.last.reasoning.isEmpty) {
+          _messages.removeLast();
+        }
+        fetchContext();
+        fetchHistory();
+      } else if (error != null && error.isNotEmpty) {
+        for (final m in _messages) {
+          m.isGenerating = false;
+        }
         if (_messages.isNotEmpty &&
             _messages.last.author == MessageAuthor.assistant) {
-          _messages.last.isGenerating = false;
+          _messages.last.content += '\n\n[Error: $error]';
+        } else {
+          _messages.add(
+            ChatMessage(
+              id: UniqueKey().toString(),
+              author: MessageAuthor.assistant,
+              content: '[Error: $error]',
+              isGenerating: false,
+            ),
+          );
         }
         fetchContext();
         fetchHistory();

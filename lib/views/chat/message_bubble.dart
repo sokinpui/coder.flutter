@@ -7,6 +7,7 @@ import 'generating_indicator.dart';
 import 'markdown_renderer.dart';
 import 'message_action_bar.dart';
 import 'reasoning_card.dart';
+import 'tool_call_card.dart';
 
 class MessageBubble extends StatefulWidget {
   const MessageBubble({
@@ -66,9 +67,13 @@ class _MessageBubbleState extends State<MessageBubble> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isToolCall = widget.message.author == MessageAuthor.toolCall;
+    final isToolResult = widget.message.author == MessageAuthor.toolResult;
     if (widget.message.isGenerating &&
         widget.message.content.isEmpty &&
-        widget.message.reasoning.isEmpty) {
+        widget.message.reasoning.isEmpty &&
+        !isToolCall &&
+        !isToolResult) {
       return _buildGeneratingPlaceholder();
     }
 
@@ -135,6 +140,26 @@ class _MessageBubbleState extends State<MessageBubble> {
                 children: [
                   if (isImageMsg) _buildImagePayload(maxBubbleWidth),
                   if (isPdfMsg) _buildPdfPayload(context, isDark),
+                  if (isToolCall)
+                    ToolCallCard(
+                      toolName: widget.message.toolName,
+                      callId: widget.message.callId,
+                      content: widget.message.content,
+                      isResult: false,
+                      isExecuting: widget.message.isGenerating,
+                      isDark: isDark,
+                      searchPattern: widget.searchPattern,
+                    ),
+                  if (isToolResult)
+                    ToolCallCard(
+                      toolName: widget.message.toolName,
+                      callId: widget.message.callId,
+                      content: widget.message.content,
+                      isResult: true,
+                      isExecuting: false,
+                      isDark: isDark,
+                      searchPattern: widget.searchPattern,
+                    ),
                   if (widget.message.reasoning.isNotEmpty)
                     ReasoningCard(
                       reasoning: widget.message.reasoning,
@@ -144,6 +169,8 @@ class _MessageBubbleState extends State<MessageBubble> {
                     _buildInlineEditor(context, isDark)
                   else if (!isImageMsg &&
                       !isPdfMsg &&
+                      !isToolCall &&
+                      !isToolResult &&
                       widget.message.content.isNotEmpty)
                     MarkdownRenderer(
                       content: widget.message.content,
@@ -152,7 +179,9 @@ class _MessageBubbleState extends State<MessageBubble> {
                       activeSearchOccurrenceInMessage:
                           widget.activeSearchOccurrence,
                     ),
-                  if (widget.message.isGenerating)
+                  if (widget.message.isGenerating &&
+                      !isToolCall &&
+                      !isToolResult)
                     const Padding(
                       padding: EdgeInsets.only(top: 6),
                       child: GeneratingIndicator(),
@@ -349,6 +378,12 @@ class _MessageBubbleState extends State<MessageBubble> {
       case MessageAuthor.assistant:
         icon = Icons.smart_toy_outlined;
         color = AppTheme.accentCyan;
+      case MessageAuthor.toolCall:
+        icon = Icons.build_outlined;
+        color = AppTheme.accentCyan;
+      case MessageAuthor.toolResult:
+        icon = Icons.check_circle_outline;
+        color = Colors.greenAccent;
     }
 
     return CircleAvatar(

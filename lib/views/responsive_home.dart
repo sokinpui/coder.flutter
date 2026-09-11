@@ -6,6 +6,7 @@ import '../core/utils/responsive.dart';
 import '../state/coder_state.dart';
 import 'chat/chat_view.dart';
 import 'sidebar/session_sidebar.dart';
+import 'widgets/disconnected_floating_window.dart';
 
 class ResponsiveHome extends StatelessWidget {
   const ResponsiveHome({super.key, required this.state});
@@ -14,13 +15,18 @@ class ResponsiveHome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (constraints.maxWidth < Responsive.compactBreakpoint) {
-          return _buildCompactLayout(context);
-        }
-        return _buildExpandedLayout(context);
-      },
+    return Stack(
+      children: [
+        LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth < Responsive.compactBreakpoint) {
+              return _buildCompactLayout(context);
+            }
+            return _buildExpandedLayout(context);
+          },
+        ),
+        DisconnectedFloatingWindow(state: state),
+      ],
     );
   }
 

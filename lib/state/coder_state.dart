@@ -44,6 +44,7 @@ class CoderState extends ChangeNotifier {
   Timer? _reconnectTimer;
   int _reconnectAttempts = 0;
   bool _isAutoReconnecting = false;
+  bool _hasAttemptedConnection = false;
 
   String get serverHost => _serverHost;
   int get serverPort => _serverPort;
@@ -63,6 +64,7 @@ class CoderState extends ChangeNotifier {
   bool get isGenerating => _isGenerating;
   bool get isAutoReconnecting => _isAutoReconnecting;
   int get tokenCount => _tokenCount;
+  bool get hasAttemptedConnection => _hasAttemptedConnection;
 
   String get httpBaseUrl {
     final scheme = _useTls ? 'https' : 'http';
@@ -197,6 +199,7 @@ class CoderState extends ChangeNotifier {
   }
 
   Future<void> initConnection({bool preserveSession = false}) async {
+    _hasAttemptedConnection = true;
     _reconnectTimer?.cancel();
     _connectionStatus = ConnectionStateStatus.connecting;
     _errorMessage = null;

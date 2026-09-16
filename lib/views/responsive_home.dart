@@ -8,10 +8,17 @@ import 'chat/chat_view.dart';
 import 'sidebar/session_sidebar.dart';
 import 'widgets/disconnected_floating_window.dart';
 
-class ResponsiveHome extends StatelessWidget {
+class ResponsiveHome extends StatefulWidget {
   const ResponsiveHome({super.key, required this.state});
 
   final CoderState state;
+
+  @override
+  State<ResponsiveHome> createState() => _ResponsiveHomeState();
+}
+
+class _ResponsiveHomeState extends State<ResponsiveHome> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   Widget build(BuildContext context) {
@@ -25,17 +32,16 @@ class ResponsiveHome extends StatelessWidget {
             return _buildExpandedLayout(context);
           },
         ),
-        DisconnectedFloatingWindow(state: state),
+        DisconnectedFloatingWindow(state: widget.state),
       ],
     );
   }
 
   Widget _buildCompactLayout(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
 
     return Scaffold(
-      key: scaffoldKey,
+      key: _scaffoldKey,
       drawerEdgeDragWidth: MediaQuery.of(context).size.width,
       appBar: AppBar(
         leading: Builder(
@@ -58,7 +64,7 @@ class ResponsiveHome extends StatelessWidget {
             children: [
               Flexible(
                 child: Text(
-                  state.sessionTitle,
+                  widget.state.sessionTitle,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -73,21 +79,23 @@ class ResponsiveHome extends StatelessWidget {
         ),
         actions: [
           IconButton(
-            icon: Icon(state.isSearchVisible ? Icons.search_off : Icons.search),
+            icon: Icon(
+              widget.state.isSearchVisible ? Icons.search_off : Icons.search,
+            ),
             tooltip: 'Find in chat (Cmd+F / Ctrl+F)',
-            onPressed: state.toggleSearch,
+            onPressed: widget.state.toggleSearch,
           ),
           IconButton(
             icon: Icon(
               isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
             ),
             tooltip: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
-            onPressed: state.toggleTheme,
+            onPressed: widget.state.toggleTheme,
           ),
           HoverAnimatedButton(
             tooltip: 'New Chat',
             hoverScale: 1.15,
-            onTap: state.newChat,
+            onTap: widget.state.newChat,
             child: const Padding(
               padding: EdgeInsets.all(8),
               child: Icon(Icons.add, size: 20),
@@ -97,7 +105,7 @@ class ResponsiveHome extends StatelessWidget {
       ),
       drawer: Drawer(
         child: SessionSidebar(
-          state: state,
+          state: widget.state,
           onSessionSelected: () => Navigator.of(context).pop(),
         ),
       ),
@@ -106,12 +114,12 @@ class ResponsiveHome extends StatelessWidget {
         onHorizontalDragEnd: (details) {
           final velocity = details.primaryVelocity ?? 0;
           if (velocity > 280) {
-            scaffoldKey.currentState?.openDrawer();
+            _scaffoldKey.currentState?.openDrawer();
           } else if (velocity < -280) {
-            scaffoldKey.currentState?.closeDrawer();
+            _scaffoldKey.currentState?.closeDrawer();
           }
         },
-        child: ChatView(state: state),
+        child: ChatView(state: widget.state),
       ),
     );
   }
@@ -123,7 +131,7 @@ class ResponsiveHome extends StatelessWidget {
           AnimatedContainer(
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeInOutCubic,
-            width: state.isSidebarVisible ? 280.0 : 0.0,
+            width: widget.state.isSidebarVisible ? 280.0 : 0.0,
             child: ClipRect(
               child: OverflowBox(
                 minWidth: 280.0,
@@ -131,7 +139,7 @@ class ResponsiveHome extends StatelessWidget {
                 alignment: Alignment.topLeft,
                 child: Row(
                   children: [
-                    Expanded(child: SessionSidebar(state: state)),
+                    Expanded(child: SessionSidebar(state: widget.state)),
                     const VerticalDivider(width: 1),
                   ],
                 ),
@@ -143,7 +151,7 @@ class ResponsiveHome extends StatelessWidget {
               children: [
                 _buildTopBar(context),
                 const Divider(),
-                Expanded(child: ChatView(state: state)),
+                Expanded(child: ChatView(state: widget.state)),
               ],
             ),
           ),
@@ -162,12 +170,14 @@ class ResponsiveHome extends StatelessWidget {
         children: [
           IconButton(
             icon: Icon(
-              state.isSidebarVisible ? Icons.view_sidebar_outlined : Icons.menu,
+              widget.state.isSidebarVisible
+                  ? Icons.view_sidebar_outlined
+                  : Icons.menu,
             ),
-            tooltip: state.isSidebarVisible
+            tooltip: widget.state.isSidebarVisible
                 ? 'Collapse Sidebar'
                 : 'Expand Sidebar',
-            onPressed: state.toggleSidebar,
+            onPressed: widget.state.toggleSidebar,
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -187,7 +197,7 @@ class ResponsiveHome extends StatelessWidget {
                   children: [
                     Flexible(
                       child: Text(
-                        state.sessionTitle,
+                        widget.state.sessionTitle,
                         style: const TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
@@ -207,21 +217,22 @@ class ResponsiveHome extends StatelessWidget {
             ),
           ),
           IconButton(
-            icon: Icon(state.isSearchVisible ? Icons.search_off : Icons.search),
+            icon: Icon(
+              widget.state.isSearchVisible ? Icons.search_off : Icons.search,
+            ),
             tooltip: 'Find in chat (Cmd+F / Ctrl+F)',
-            onPressed: state.toggleSearch,
+            onPressed: widget.state.toggleSearch,
           ),
           IconButton(
             icon: Icon(
               isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
             ),
             tooltip: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
-            onPressed: state.toggleTheme,
+            onPressed: widget.state.toggleTheme,
           ),
           HoverAnimatedButton(
             tooltip: 'New Chat',
-            hoverScale: 1.15,
-            onTap: state.newChat,
+            onTap: widget.state.newChat,
             child: const Padding(
               padding: EdgeInsets.all(8),
               child: Icon(Icons.add, size: 20),
@@ -233,7 +244,7 @@ class ResponsiveHome extends StatelessWidget {
   }
 
   void _showRenameDialog(BuildContext context) {
-    final controller = TextEditingController(text: state.sessionTitle);
+    final controller = TextEditingController(text: widget.state.sessionTitle);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -250,7 +261,7 @@ class ResponsiveHome extends StatelessWidget {
             isDense: true,
           ),
           onSubmitted: (val) {
-            state.renameSession(val);
+            widget.state.renameSession(val);
             Navigator.of(ctx).pop();
           },
         ),
@@ -261,7 +272,7 @@ class ResponsiveHome extends StatelessWidget {
           ),
           FilledButton(
             onPressed: () {
-              state.renameSession(controller.text);
+              widget.state.renameSession(controller.text);
               Navigator.of(ctx).pop();
             },
             child: const Text('Save'),

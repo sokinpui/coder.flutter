@@ -124,113 +124,38 @@ class ChatInputBar extends StatelessWidget {
                         physics: const BouncingScrollPhysics(
                           parent: AlwaysScrollableScrollPhysics(),
                         ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(
-                              Icons.add_photo_alternate_outlined,
-                              size: 20,
-                            ),
-                            tooltip: 'Attach Image / Paste',
-                            onPressed: onAttachImage,
-                            constraints: const BoxConstraints(
-                              minWidth: 32,
-                              minHeight: 32,
-                            ),
-                            padding: EdgeInsets.zero,
-                          ),
-                          IconButton(
-                            icon: const Icon(
-                              Icons.attach_file_outlined,
-                              size: 20,
-                            ),
-                            tooltip: 'Add File / PDF to Context',
-                            onPressed: onAddFileOrPdf,
-                            constraints: const BoxConstraints(
-                              minWidth: 32,
-                              minHeight: 32,
-                            ),
-                            padding: EdgeInsets.zero,
-                          ),
-                          const SizedBox(width: 6),
-                          InkWell(
-                            onTap: onOpenModelPicker,
-                            borderRadius: BorderRadius.circular(12),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(
+                                Icons.add_photo_alternate_outlined,
+                                size: 20,
                               ),
-                              decoration: BoxDecoration(
-                                color: isDark
-                                    ? AppTheme.surfaceSubtle
-                                    : AppTheme.lightSurfaceSubtle,
-                                borderRadius: BorderRadius.circular(12),
+                              tooltip: 'Attach Image / Paste',
+                              onPressed: onAttachImage,
+                              constraints: const BoxConstraints(
+                                minWidth: 32,
+                                minHeight: 32,
                               ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.memory,
-                                    size: 12,
-                                    color: AppTheme.primary,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    activeModel,
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      color: AppTheme.textMuted,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 2),
-                                  const Icon(
-                                    Icons.arrow_drop_down,
-                                    size: 14,
-                                    color: AppTheme.textMuted,
-                                  ),
-                                ],
-                              ),
+                              padding: EdgeInsets.zero,
                             ),
-                          ),
-                          if (tokenCount > 0) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
+                            IconButton(
+                              icon: const Icon(
+                                Icons.attach_file_outlined,
+                                size: 20,
                               ),
-                              decoration: BoxDecoration(
-                                color: isDark
-                                    ? AppTheme.surfaceSubtle
-                                    : AppTheme.lightSurfaceSubtle,
-                                borderRadius: BorderRadius.circular(12),
+                              tooltip: 'Add File / PDF to Context',
+                              onPressed: onAddFileOrPdf,
+                              constraints: const BoxConstraints(
+                                minWidth: 32,
+                                minHeight: 32,
                               ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.toll_outlined,
-                                    size: 12,
-                                    color: Colors.greenAccent,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '≈$tokenCount',
-                                    style: AppTheme.monoTextStyle(
-                                      fontSize: 11,
-                                      color: AppTheme.textMuted,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                              padding: EdgeInsets.zero,
                             ),
-                          ],
-                          if (contextDocumentsCount > 0) ...[
                             const SizedBox(width: 6),
                             InkWell(
-                              onTap: onOpenContextDialog,
+                              onTap: onOpenModelPicker,
                               borderRadius: BorderRadius.circular(12),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
@@ -247,29 +172,31 @@ class ChatInputBar extends StatelessWidget {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     const Icon(
-                                      Icons.picture_as_pdf_outlined,
+                                      Icons.memory,
                                       size: 12,
-                                      color: AppTheme.accentYellow,
+                                      color: AppTheme.primary,
                                     ),
                                     const SizedBox(width: 4),
                                     Text(
-                                      '$contextDocumentsCount doc${contextDocumentsCount == 1 ? '' : 's'}',
+                                      activeModel,
                                       style: const TextStyle(
                                         fontSize: 11,
                                         color: AppTheme.textMuted,
                                       ),
                                     ),
+                                    const SizedBox(width: 2),
+                                    const Icon(
+                                      Icons.arrow_drop_down,
+                                      size: 14,
+                                      color: AppTheme.textMuted,
+                                    ),
                                   ],
                                 ),
                               ),
                             ),
-                          ],
-                          if (contextFilesCount > 0) ...[
-                            const SizedBox(width: 6),
-                            InkWell(
-                              onTap: onOpenContextDialog,
-                              borderRadius: BorderRadius.circular(12),
-                              child: Container(
+                            if (tokenCount > 0) ...[
+                              const SizedBox(width: 6),
+                              Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 8,
                                   vertical: 4,
@@ -284,14 +211,14 @@ class ChatInputBar extends StatelessWidget {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     const Icon(
-                                      Icons.folder_outlined,
+                                      Icons.toll_outlined,
                                       size: 12,
-                                      color: AppTheme.accentCyan,
+                                      color: Colors.greenAccent,
                                     ),
                                     const SizedBox(width: 4),
                                     Text(
-                                      '$contextFilesCount file${contextFilesCount == 1 ? '' : 's'}',
-                                      style: const TextStyle(
+                                      '≈$tokenCount',
+                                      style: AppTheme.monoTextStyle(
                                         fontSize: 11,
                                         color: AppTheme.textMuted,
                                       ),
@@ -299,11 +226,84 @@ class ChatInputBar extends StatelessWidget {
                                   ],
                                 ),
                               ),
-                            ),
+                            ],
+                            if (contextDocumentsCount > 0) ...[
+                              const SizedBox(width: 6),
+                              InkWell(
+                                onTap: onOpenContextDialog,
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isDark
+                                        ? AppTheme.surfaceSubtle
+                                        : AppTheme.lightSurfaceSubtle,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.picture_as_pdf_outlined,
+                                        size: 12,
+                                        color: AppTheme.accentYellow,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '$contextDocumentsCount doc${contextDocumentsCount == 1 ? '' : 's'}',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: AppTheme.textMuted,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                            if (contextFilesCount > 0) ...[
+                              const SizedBox(width: 6),
+                              InkWell(
+                                onTap: onOpenContextDialog,
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isDark
+                                        ? AppTheme.surfaceSubtle
+                                        : AppTheme.lightSurfaceSubtle,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.folder_outlined,
+                                        size: 12,
+                                        color: AppTheme.accentCyan,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '$contextFilesCount file${contextFilesCount == 1 ? '' : 's'}',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: AppTheme.textMuted,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
-                    ),
                     ),
                   ),
                   const SizedBox(width: 8),

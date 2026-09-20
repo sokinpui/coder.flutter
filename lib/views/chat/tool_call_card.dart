@@ -62,14 +62,14 @@ class _ToolCallCardState extends State<ToolCallCard> {
 
   @override
   Widget build(BuildContext context) {
-    final accentColor =
-        widget.isResult ? const Color(0xFF7EE787) : AppTheme.accentCyan;
+    final accentColor = widget.isResult
+        ? const Color(0xFF7EE787)
+        : AppTheme.accentCyan;
     final bgColor = widget.isDark
         ? AppTheme.surfaceSubtle.withOpacity(0.5)
         : AppTheme.lightSurfaceSubtle.withOpacity(0.8);
-    final borderColor =
-        (widget.isDark ? AppTheme.border : AppTheme.lightBorder)
-            .withOpacity(0.7);
+    final borderColor = (widget.isDark ? AppTheme.border : AppTheme.lightBorder)
+        .withOpacity(0.7);
 
     final titlePrefix = widget.isResult ? 'Tool Result' : 'Tool Call';
     final nameDisplay = widget.toolName != null && widget.toolName!.isNotEmpty
@@ -203,9 +203,7 @@ class _ToolCallCardState extends State<ToolCallCard> {
                             ? const Color(0xFF10141B)
                             : const Color(0xFFF0F2F5),
                         borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: borderColor.withOpacity(0.5),
-                        ),
+                        border: Border.all(color: borderColor.withOpacity(0.5)),
                       ),
                       child: SingleChildScrollView(
                         child: SingleChildScrollView(

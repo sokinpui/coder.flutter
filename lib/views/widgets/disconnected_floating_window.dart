@@ -58,12 +58,16 @@ class _DisconnectedFloatingWindowState
     if (_position != null) {
       final maxX = math.max(8.0, screenSize.width - windowWidth - 8.0);
       final maxY = math.max(8.0, screenSize.height - 80.0);
-      return Offset(_position!.dx.clamp(8.0, maxX), _position!.dy.clamp(8.0, maxY));
+      return Offset(
+        _position!.dx.clamp(8.0, maxX),
+        _position!.dy.clamp(8.0, maxY),
+      );
     }
 
     final isCompact = Responsive.isCompact(context);
-    final defaultLeft =
-        isCompact ? 16.0 : math.max(16.0, screenSize.width - windowWidth - 24.0);
+    final defaultLeft = isCompact
+        ? 16.0
+        : math.max(16.0, screenSize.width - windowWidth - 24.0);
     final defaultTop = isCompact ? 72.0 : 60.0;
     return Offset(defaultLeft, defaultTop);
   }
@@ -172,7 +176,11 @@ class _DisconnectedFloatingWindowState
             onTap: isConnecting
                 ? null
                 : () => widget.state.initConnection(preserveSession: true),
-            child: const Icon(Icons.refresh, size: 16, color: AppTheme.textMuted),
+            child: const Icon(
+              Icons.refresh,
+              size: 16,
+              color: AppTheme.textMuted,
+            ),
           ),
           const SizedBox(width: 4),
           HoverAnimatedButton(
@@ -244,7 +252,11 @@ class _DisconnectedFloatingWindowState
                 onTap: () => setState(() => _isMinimized = true),
                 child: const Padding(
                   padding: EdgeInsets.all(4),
-                  child: Icon(Icons.remove, size: 16, color: AppTheme.textMuted),
+                  child: Icon(
+                    Icons.remove,
+                    size: 16,
+                    color: AppTheme.textMuted,
+                  ),
                 ),
               ),
             ],
@@ -340,8 +352,9 @@ class _DisconnectedFloatingWindowState
                     ),
                     onPressed: isConnecting
                         ? null
-                        : () =>
-                              widget.state.initConnection(preserveSession: true),
+                        : () => widget.state.initConnection(
+                            preserveSession: true,
+                          ),
                     icon: isConnecting
                         ? const SizedBox(
                             width: 12,

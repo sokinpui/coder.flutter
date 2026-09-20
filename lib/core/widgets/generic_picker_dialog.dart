@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../utils/fuzzy_matcher.dart';
 import '../theme/app_theme.dart';
 
 class PickerItem<T> {
@@ -19,18 +20,6 @@ class PickerItem<T> {
   final String? badge;
   final String? searchText;
   final T data;
-}
-
-class _ScoredPickerItem<T> {
-  const _ScoredPickerItem({
-    required this.item,
-    required this.score,
-    required this.index,
-  });
-
-  final PickerItem<T> item;
-  final int score;
-  final int index;
 }
 
 class GenericPickerDialog<T> extends StatefulWidget {
@@ -99,133 +88,22 @@ class _GenericPickerDialogState<T> extends State<GenericPickerDialog<T>> {
   }
 
   void _onFilterChanged() {
-    final query = _searchController.text.trim();
-    if (query.isEmpty) {
-      setState(() {
-        _filteredItems = widget.items;
-        _selectedIndex = 0;
-      });
-      return;
-    }
-
-    final scored = <_ScoredPickerItem<T>>[];
-    for (var i = 0; i < widget.items.length; i++) {
-      final item = widget.items[i];
-      final score = _scoreItem(query, item);
-      if (score != null) {
-        scored.add(_ScoredPickerItem(item: item, score: score, index: i));
-      }
-    }
-
-    scored.sort((a, b) {
-      final cmp = b.score.compareTo(a.score);
-      if (cmp != 0) return cmp;
-      return a.index.compareTo(b.index);
-    });
-
     setState(() {
-      _filteredItems = scored.map((s) => s.item).toList();
+      _filteredItems = FuzzyMatcher.match<PickerItem<T>>(
+        query: _searchController.text,
+        items: widget.items,
+        targetSelector: (item) {
+          final targets = [item.title];
+          if (item.searchText != null) {
+            targets.add(item.searchText!);
+          } else if (item.description != null) {
+            targets.add('${item.title} ${item.description}');
+          }
+          return targets;
+        },
+      );
       _selectedIndex = 0;
     });
-  }
-
-  static int? _scoreItem(String query, PickerItem item) {
-    final cleanQuery = query.trim().toLowerCase();
-    if (cleanQuery.isEmpty) return 0;
-
-    final primary = item.title.toLowerCase();
-    final secondary =
-        (item.searchText ??
-                (item.description != null
-                    ? '${item.title} ${item.description}'
-                    : ''))
-            .toLowerCase();
-
-    final terms = cleanQuery
-        .split(RegExp(r'\s+'))
-        .where((t) => t.isNotEmpty)
-        .toList();
-    if (terms.isEmpty) return 0;
-
-    var totalScore = 0;
-    for (final term in terms) {
-      final primaryScore = _computeFuzzyScore(term, primary);
-      final secondaryScore = secondary.isNotEmpty && secondary != primary
-          ? _computeFuzzyScore(term, secondary)
-          : null;
-
-      if (primaryScore == null && secondaryScore == null) {
-        return null;
-      }
-
-      final bestTermScore = (primaryScore != null && secondaryScore != null)
-          ? (primaryScore >= secondaryScore ? primaryScore : secondaryScore)
-          : (primaryScore ?? secondaryScore!);
-
-      totalScore += bestTermScore;
-    }
-
-    return totalScore;
-  }
-
-  static int? _computeFuzzyScore(String query, String target) {
-    if (query.isEmpty) return 0;
-    if (target.isEmpty) return null;
-
-    if (query == target) return 10000;
-    if (target.startsWith(query)) {
-      return 5000 + (100 - target.length.clamp(0, 100));
-    }
-    final subIndex = target.indexOf(query);
-    if (subIndex != -1) {
-      return 3000 - subIndex * 10 + (100 - target.length.clamp(0, 100));
-    }
-
-    var qIdx = 0;
-    var tIdx = 0;
-    var score = 0;
-    var consecutive = 0;
-    var firstMatchIdx = -1;
-    var lastMatchIdx = -1;
-
-    while (qIdx < query.length && tIdx < target.length) {
-      if (query[qIdx] == target[tIdx]) {
-        if (firstMatchIdx == -1) firstMatchIdx = tIdx;
-        lastMatchIdx = tIdx;
-
-        var charScore = 10;
-        if (tIdx == 0) {
-          charScore += 30;
-        } else {
-          final prev = target[tIdx - 1];
-          if (prev == '/' ||
-              prev == '-' ||
-              prev == '_' ||
-              prev == '.' ||
-              prev == ' ') {
-            charScore += 25;
-          }
-        }
-
-        if (consecutive > 0) {
-          charScore += consecutive * 15;
-        }
-        consecutive++;
-        score += charScore;
-        qIdx++;
-      } else {
-        consecutive = 0;
-      }
-      tIdx++;
-    }
-
-    if (qIdx < query.length) {
-      return null;
-    }
-
-    final spread = (lastMatchIdx - firstMatchIdx + 1) - query.length;
-    score -= spread * 2;
-    return score;
   }
 
   void _selectItem(PickerItem<T> item) {

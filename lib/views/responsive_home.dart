@@ -103,9 +103,8 @@ class _ResponsiveHomeState extends State<ResponsiveHome> {
         ),
       ),
       body: ChatView(key: _chatViewKey, state: widget.state),
-      );
+    );
   }
-
 
   Widget _buildExpandedLayout(BuildContext context) {
     return Scaffold(
@@ -134,7 +133,9 @@ class _ResponsiveHomeState extends State<ResponsiveHome> {
               children: [
                 _buildTopBar(context),
                 const Divider(),
-                Expanded(child: ChatView(key: _chatViewKey, state: widget.state)),
+                Expanded(
+                  child: ChatView(key: _chatViewKey, state: widget.state),
+                ),
               ],
             ),
           ),

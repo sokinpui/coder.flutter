@@ -64,28 +64,28 @@ class StagedAttachmentsPreview extends StatelessWidget {
             child: GestureDetector(
               onTap: () => onPreviewAttachment?.call(attachment),
               child: Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: theme.dividerColor),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(7),
-                child: attachment.bytes != null
-                    ? Image.memory(attachment.bytes!, fit: BoxFit.cover)
-                    : Container(
-                        color: isDark
-                            ? AppTheme.surfaceSubtle
-                            : AppTheme.lightSurfaceSubtle,
-                        child: const Icon(
-                          Icons.image,
-                          size: 24,
-                          color: AppTheme.textMuted,
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: theme.dividerColor),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(7),
+                  child: attachment.bytes != null
+                      ? Image.memory(attachment.bytes!, fit: BoxFit.cover)
+                      : Container(
+                          color: isDark
+                              ? AppTheme.surfaceSubtle
+                              : AppTheme.lightSurfaceSubtle,
+                          child: const Icon(
+                            Icons.image,
+                            size: 24,
+                            color: AppTheme.textMuted,
+                          ),
                         ),
-                      ),
+                ),
               ),
-            ),
             ),
           ),
           Positioned(
@@ -194,14 +194,14 @@ class StagedAttachmentsPreview extends StatelessWidget {
                   ),
               ],
             ),
-         ),
-         IconButton(
-           icon: const Icon(Icons.close, size: 16),
-           padding: EdgeInsets.zero,
-           constraints: const BoxConstraints(),
-           color: AppTheme.textMuted,
-           onPressed: () => onRemoveAttachment(index),
-         ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 16),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            color: AppTheme.textMuted,
+            onPressed: () => onRemoveAttachment(index),
+          ),
         ],
       ),
     );

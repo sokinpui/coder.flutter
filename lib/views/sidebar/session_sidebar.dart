@@ -5,6 +5,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_icon_widget.dart';
 import '../../core/widgets/hover_animated_button.dart';
 import '../../state/coder_state.dart';
+import '../history/history_page.dart';
 import '../settings/server_settings_dialog.dart';
 import 'session_list_item.dart';
 
@@ -31,6 +32,7 @@ class SessionSidebar extends StatelessWidget {
         children: [
           _buildHeader(context),
           _buildNewChatButton(context),
+          _buildHistoryButton(context),
           const Divider(),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -98,7 +100,7 @@ class SessionSidebar extends StatelessWidget {
     final textColor = isDark ? AppTheme.textMain : AppTheme.lightTextMain;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 4),
       child: HoverAnimatedButton(
         tooltip: 'Start new chat session',
         hoverScale: 1.03,
@@ -133,6 +135,55 @@ class SessionSidebar extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildHistoryButton(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final textColor = isDark ? AppTheme.textMain : AppTheme.lightTextMain;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+      child: HoverAnimatedButton(
+        tooltip: 'Open history list',
+        hoverScale: 1.03,
+        onTap: () => _openHistoryPage(context),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 14),
+          decoration: BoxDecoration(
+            color: isDark
+                ? AppTheme.surfaceSubtle
+                : AppTheme.lightSurfaceSubtle,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: theme.dividerColor),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.history, size: 18, color: textColor),
+              const SizedBox(width: 8),
+              Text(
+                'History',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  color: textColor,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openHistoryPage(BuildContext context) {
+    if (Responsive.isCompact(context)) {
+      Navigator.of(context).pop();
+    }
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => HistoryPage(state: state)));
   }
 
   Widget _buildSessionList() {

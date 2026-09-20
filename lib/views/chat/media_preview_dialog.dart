@@ -27,11 +27,8 @@ class MediaPreviewDialog extends StatefulWidget {
     showDialog(
       context: context,
       barrierColor: Colors.black.withOpacity(0.85),
-      builder: (_) => MediaPreviewDialog(
-        title: title,
-        bytes: bytes,
-        path: path,
-      ),
+      builder: (_) =>
+          MediaPreviewDialog(title: title, bytes: bytes, path: path),
     );
   }
 
@@ -99,9 +96,7 @@ class _MediaPreviewDialogState extends State<MediaPreviewDialog> {
               children: [
                 _buildHeader(context),
                 const Divider(height: 1, color: AppTheme.border),
-                Flexible(
-                  child: _buildImageViewer(),
-                ),
+                Flexible(child: _buildImageViewer()),
               ],
             ),
           ),
@@ -132,21 +127,25 @@ class _MediaPreviewDialogState extends State<MediaPreviewDialog> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
-            HoverAnimatedButton(
-              tooltip: 'Reset zoom',
-              onTap: _resetZoom,
-              child: const Padding(
-                padding: EdgeInsets.all(6),
-                child: Icon(Icons.refresh, size: 16, color: AppTheme.textMuted),
-              ),
+          HoverAnimatedButton(
+            tooltip: 'Reset zoom',
+            onTap: _resetZoom,
+            child: const Padding(
+              padding: EdgeInsets.all(6),
+              child: Icon(Icons.refresh, size: 16, color: AppTheme.textMuted),
             ),
+          ),
           if (widget.path != null && widget.path!.isNotEmpty)
             HoverAnimatedButton(
               tooltip: 'Open in system viewer',
               onTap: _openExternal,
               child: const Padding(
                 padding: EdgeInsets.all(6),
-                child: Icon(Icons.open_in_new, size: 16, color: AppTheme.textMuted),
+                child: Icon(
+                  Icons.open_in_new,
+                  size: 16,
+                  color: AppTheme.textMuted,
+                ),
               ),
             ),
           const SizedBox(width: 4),

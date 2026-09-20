@@ -312,45 +312,46 @@ class _MessageBubbleState extends State<MessageBubble> {
       onTap: () => _openPdf(path),
       borderRadius: BorderRadius.circular(10),
       child: Container(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.surface : AppTheme.lightSurface,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Theme.of(context).dividerColor),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.picture_as_pdf,
-            color: AppTheme.accentYellow,
-            size: 24,
-          ),
-          const SizedBox(width: 10),
-          Flexible(
-            child: Text(
-              name,
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-              overflow: TextOverflow.ellipsis,
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.surface : AppTheme.lightSurface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Theme.of(context).dividerColor),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.picture_as_pdf,
+              color: AppTheme.accentYellow,
+              size: 24,
             ),
-          ),
-          const SizedBox(width: 8),
-          const Icon(
-            Icons.open_in_new,
-            size: 14,
-            color: AppTheme.textMuted,
-          ),
-        ],
-      ),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Text(
+                name,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(Icons.open_in_new, size: 14, color: AppTheme.textMuted),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildImagePayload(BuildContext context, double maxWidth) {
-    final title = widget.message.imagePath?.split(RegExp(r'[/\\]')).last ?? 'Image';
+    final title =
+        widget.message.imagePath?.split(RegExp(r'[/\\]')).last ?? 'Image';
     final hasBytes = widget.message.imageData != null;
-    final hasFilePath = widget.message.imagePath != null &&
+    final hasFilePath =
+        widget.message.imagePath != null &&
         File(widget.message.imagePath!).existsSync();
 
     return GestureDetector(
@@ -372,25 +373,35 @@ class _MessageBubbleState extends State<MessageBubble> {
               child: ConstrainedBox(
                 constraints: BoxConstraints(maxHeight: 400, maxWidth: maxWidth),
                 child: hasBytes
-                    ? Image.memory(widget.message.imageData!, fit: BoxFit.contain)
+                    ? Image.memory(
+                        widget.message.imageData!,
+                        fit: BoxFit.contain,
+                      )
                     : (hasFilePath
-                        ? Image.file(File(widget.message.imagePath!), fit: BoxFit.contain)
-                        : Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.image_outlined, size: 18, color: AppTheme.accentCyan),
-                              const SizedBox(width: 8),
-                              Flexible(
-                                child: Text(
-                                  widget.message.imagePath ?? 'Image',
-                                  style: AppTheme.monoTextStyle(
-                                    color: AppTheme.textMuted,
-                                    fontSize: 12,
+                          ? Image.file(
+                              File(widget.message.imagePath!),
+                              fit: BoxFit.contain,
+                            )
+                          : Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.image_outlined,
+                                  size: 18,
+                                  color: AppTheme.accentCyan,
+                                ),
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: Text(
+                                    widget.message.imagePath ?? 'Image',
+                                    style: AppTheme.monoTextStyle(
+                                      color: AppTheme.textMuted,
+                                      fontSize: 12,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
-                          )),
+                              ],
+                            )),
               ),
             ),
             Container(

@@ -19,6 +19,7 @@ class ResponsiveHome extends StatefulWidget {
 
 class _ResponsiveHomeState extends State<ResponsiveHome> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final GlobalKey _chatViewKey = GlobalKey();
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +43,6 @@ class _ResponsiveHomeState extends State<ResponsiveHome> {
 
     return Scaffold(
       key: _scaffoldKey,
-      drawerEdgeDragWidth: MediaQuery.of(context).size.width,
       appBar: AppBar(
         leading: Builder(
           builder: (ctx) => IconButton(
@@ -109,20 +109,10 @@ class _ResponsiveHomeState extends State<ResponsiveHome> {
           onSessionSelected: () => Navigator.of(context).pop(),
         ),
       ),
-      body: GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onHorizontalDragEnd: (details) {
-          final velocity = details.primaryVelocity ?? 0;
-          if (velocity > 280) {
-            _scaffoldKey.currentState?.openDrawer();
-          } else if (velocity < -280) {
-            _scaffoldKey.currentState?.closeDrawer();
-          }
-        },
-        child: ChatView(state: widget.state),
-      ),
-    );
+      body: ChatView(key: _chatViewKey, state: widget.state),
+      );
   }
+
 
   Widget _buildExpandedLayout(BuildContext context) {
     return Scaffold(
@@ -151,7 +141,7 @@ class _ResponsiveHomeState extends State<ResponsiveHome> {
               children: [
                 _buildTopBar(context),
                 const Divider(),
-                Expanded(child: ChatView(state: widget.state)),
+                Expanded(child: ChatView(key: _chatViewKey, state: widget.state)),
               ],
             ),
           ),

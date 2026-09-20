@@ -7,11 +7,13 @@ class StagedAttachmentsPreview extends StatelessWidget {
   const StagedAttachmentsPreview({
     super.key,
     required this.attachments,
+    this.onPreviewAttachment,
     required this.onRemoveAttachment,
     this.onRetryUpload,
   });
 
   final List<StagedAttachment> attachments;
+  final ValueChanged<StagedAttachment>? onPreviewAttachment;
   final ValueChanged<int> onRemoveAttachment;
   final ValueChanged<int>? onRetryUpload;
 
@@ -59,7 +61,9 @@ class StagedAttachmentsPreview extends StatelessWidget {
           Positioned(
             left: 0,
             bottom: 0,
-            child: Container(
+            child: GestureDetector(
+              onTap: () => onPreviewAttachment?.call(attachment),
+              child: Container(
               width: 60,
               height: 60,
               decoration: BoxDecoration(
@@ -81,6 +85,7 @@ class StagedAttachmentsPreview extends StatelessWidget {
                         ),
                       ),
               ),
+            ),
             ),
           ),
           Positioned(
@@ -189,14 +194,14 @@ class StagedAttachmentsPreview extends StatelessWidget {
                   ),
               ],
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.close, size: 16),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-            color: AppTheme.textMuted,
-            onPressed: () => onRemoveAttachment(index),
-          ),
+         ),
+         IconButton(
+           icon: const Icon(Icons.close, size: 16),
+           padding: EdgeInsets.zero,
+           constraints: const BoxConstraints(),
+           color: AppTheme.textMuted,
+           onPressed: () => onRemoveAttachment(index),
+         ),
         ],
       ),
     );

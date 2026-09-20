@@ -1,10 +1,13 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/responsive.dart';
 import '../../models/chat_message.dart';
 import 'generating_indicator.dart';
 import 'markdown_renderer.dart';
+import 'media_preview_dialog.dart';
 import 'message_action_bar.dart';
 import 'reasoning_card.dart';
 import 'tool_call_card.dart';
@@ -138,7 +141,7 @@ class _MessageBubbleState extends State<MessageBubble> {
                     : CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (isImageMsg) _buildImagePayload(maxBubbleWidth),
+                  if (isImageMsg) _buildImagePayload(context, maxBubbleWidth),
                   if (isPdfMsg) _buildPdfPayload(context, isDark),
                   if (isToolCall)
                     ToolCallCard(
@@ -292,9 +295,23 @@ class _MessageBubbleState extends State<MessageBubble> {
     );
   }
 
+  Future<void> _openPdf(String path) async {
+    if (path.isEmpty) return;
+    final uri = path.startsWith('http://') || path.startsWith('https://')
+        ? Uri.parse(path)
+        : Uri.file(path);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
+  }
+
   Widget _buildPdfPayload(BuildContext context, bool isDark) {
     final name = widget.message.pdfName ?? widget.message.content;
-    return Container(
+    final path = widget.message.pdfPath ?? widget.message.content;
+    return InkWell(
+      onTap: () => _openPdf(path),
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
@@ -318,37 +335,76 @@ class _MessageBubbleState extends State<MessageBubble> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
+          const SizedBox(width: 8),
+          const Icon(
+            Icons.open_in_new,
+            size: 14,
+            color: AppTheme.textMuted,
+          ),
         ],
+      ),
       ),
     );
   }
 
-  Widget _buildImagePayload(double maxWidth) {
-    if (widget.message.imageData != null) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: 400, maxWidth: maxWidth),
-          child: Image.memory(widget.message.imageData!, fit: BoxFit.contain),
-        ),
-      );
-    }
+  Widget _buildImagePayload(BuildContext context, double maxWidth) {
+    final title = widget.message.imagePath?.split(RegExp(r'[/\\]')).last ?? 'Image';
+    final hasBytes = widget.message.imageData != null;
+    final hasFilePath = widget.message.imagePath != null &&
+        File(widget.message.imagePath!).existsSync();
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Icon(Icons.image_outlined, size: 18, color: AppTheme.accentCyan),
-        const SizedBox(width: 8),
-        Flexible(
-          child: Text(
-            widget.message.imagePath ?? 'Image',
-            style: AppTheme.monoTextStyle(
-              color: AppTheme.textMuted,
-              fontSize: 12,
+    return GestureDetector(
+      onTap: () {
+        MediaPreviewDialog.show(
+          context,
+          title: title,
+          bytes: widget.message.imageData,
+          path: widget.message.imagePath,
+        );
+      },
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: 400, maxWidth: maxWidth),
+                child: hasBytes
+                    ? Image.memory(widget.message.imageData!, fit: BoxFit.contain)
+                    : (hasFilePath
+                        ? Image.file(File(widget.message.imagePath!), fit: BoxFit.contain)
+                        : Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.image_outlined, size: 18, color: AppTheme.accentCyan),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  widget.message.imagePath ?? 'Image',
+                                  style: AppTheme.monoTextStyle(
+                                    color: AppTheme.textMuted,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )),
+              ),
             ),
-          ),
+            Container(
+              margin: const EdgeInsets.all(6),
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.55),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.zoom_in, size: 16, color: Colors.white),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 

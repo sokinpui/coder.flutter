@@ -44,6 +44,8 @@ class CoderState extends ChangeNotifier {
   Timer? _reconnectTimer;
   int _reconnectAttempts = 0;
   bool _isAutoReconnecting = false;
+  Timer? _chunkThrottleTimer;
+  bool _hasPendingChunkNotification = false;
   bool _hasAttemptedConnection = false;
 
   String get serverHost => _serverHost;
@@ -805,6 +807,7 @@ class CoderState extends ChangeNotifier {
     if (method == 'session/chunk' && params is Map) {
       final content = params['content'] as String? ?? '';
       final reasoning = params['reasoningContent'] as String? ?? '';
+      _notifyChunk();
       final done = params['done'] as bool? ?? false;
       final tokenCount = (params['tokenCount'] as num?)?.toInt();
       final error = params['error'] as String?;
@@ -916,6 +919,7 @@ class CoderState extends ChangeNotifier {
         fetchContext();
         fetchHistory();
       }
+      _flushChunkNotifications();
       notifyListeners();
       return;
     }
@@ -939,8 +943,27 @@ class CoderState extends ChangeNotifier {
     }
   }
 
+  void _notifyChunk() {
+    if (_chunkThrottleTimer != null && _chunkThrottleTimer!.isActive) {
+      _hasPendingChunkNotification = true;
+      return;
+    }
+    notifyListeners();
+    _chunkThrottleTimer = Timer(const Duration(milliseconds: 32), () {
+      if (!_hasPendingChunkNotification) return;
+      _hasPendingChunkNotification = false;
+      notifyListeners();
+    });
+  }
+
+  void _flushChunkNotifications() {
+    _chunkThrottleTimer?.cancel();
+    _hasPendingChunkNotification = false;
+  }
+
   @override
   void dispose() {
+    _chunkThrottleTimer?.cancel();
     _reconnectTimer?.cancel();
     _client.disconnect();
     super.dispose();

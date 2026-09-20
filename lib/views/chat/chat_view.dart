@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../../core/services/clipboard_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/staged_attachment.dart';
+import 'media_preview_dialog.dart';
 import '../settings/context_dialog.dart';
 import '../settings/model_picker_dialog.dart';
 import '../../state/coder_state.dart';
@@ -35,6 +36,8 @@ class ChatView extends StatefulWidget {
 }
 
 class _ChatViewState extends State<ChatView> {
+  static String _draftPrompt = '';
+  static final List<StagedAttachment> _stagedDraft = [];
   final Map<String, GlobalKey> _messageKeys = {};
   final TextEditingController _promptController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
@@ -83,6 +86,13 @@ class _ChatViewState extends State<ChatView> {
   @override
   void initState() {
     super.initState();
+    if (_draftPrompt.isNotEmpty) {
+      _promptController.text = _draftPrompt;
+    }
+    if (_stagedDraft.isNotEmpty) {
+      _stagedAttachments.addAll(_stagedDraft);
+    }
+    _promptController.addListener(_onPromptChanged);
     _searchController.addListener(_onSearchChanged);
     _lastMessageCount = widget.state.messages.length;
   }
@@ -126,6 +136,10 @@ class _ChatViewState extends State<ChatView> {
     super.dispose();
   }
 
+  void _onPromptChanged() {
+    _draftPrompt = _promptController.text;
+  }
+
   void _maintainInputFocus() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _inputFocusNode.canRequestFocus) {
@@ -149,13 +163,18 @@ class _ChatViewState extends State<ChatView> {
   void _autoScrollToBottomIfAppropriate() {
     if (widget.state.isSearchVisible) return;
     if (!_scrollController.hasClients) return;
+    if (_scrollController.position.isScrollingNotifier.value) return;
 
     final maxScroll = _scrollController.position.maxScrollExtent;
     final currentScroll = _scrollController.offset;
-    final isNearBottom = (maxScroll - currentScroll) <= 150.0;
-    if (isNearBottom) {
-      _scrollToBottom();
-    }
+    final isNearBottom = (maxScroll - currentScroll) <= 120.0;
+    if (!isNearBottom) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      if (_scrollController.position.isScrollingNotifier.value) return;
+      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+    });
   }
 
   void _onSearchChanged() {
@@ -289,6 +308,8 @@ class _ChatViewState extends State<ChatView> {
         .where((a) => a.type == AttachmentType.pdf)
         .toList();
 
+    _draftPrompt = '';
+    _stagedDraft.clear();
     _promptController.clear();
     setState(() => _stagedAttachments.clear());
 
@@ -310,14 +331,14 @@ class _ChatViewState extends State<ChatView> {
       final picked = await _clipboardService.pickImage();
       if (picked != null && mounted) {
         setState(() {
-          _stagedAttachments.add(
-            StagedAttachment(
-              id: UniqueKey().toString(),
-              type: AttachmentType.image,
-              name: 'image.png',
-              bytes: picked,
-            ),
+          final attachment = StagedAttachment(
+            id: UniqueKey().toString(),
+            type: AttachmentType.image,
+            name: 'image.png',
+            bytes: picked,
           );
+          _stagedAttachments.add(attachment);
+          _stagedDraft.add(attachment);
         });
       }
     } finally {
@@ -344,6 +365,7 @@ class _ChatViewState extends State<ChatView> {
           isUploading: true,
         );
         setState(() => _stagedAttachments.add(item));
+        _stagedDraft.add(item);
         try {
           await widget.state.addPdf(path);
           if (mounted) {
@@ -381,14 +403,14 @@ class _ChatViewState extends State<ChatView> {
       return;
     }
     setState(() {
-      _stagedAttachments.add(
-        StagedAttachment(
-          id: UniqueKey().toString(),
-          type: AttachmentType.image,
-          name: 'pasted_image.png',
-          bytes: img,
-        ),
+      final attachment = StagedAttachment(
+        id: UniqueKey().toString(),
+        type: AttachmentType.image,
+        name: 'pasted_image.png',
+        bytes: img,
       );
+      _stagedAttachments.add(attachment);
+      _stagedDraft.add(attachment);
     });
     _maintainInputFocus();
   }
@@ -396,6 +418,8 @@ class _ChatViewState extends State<ChatView> {
   void _removeStagedAttachment(int index) {
     if (index < 0 || index >= _stagedAttachments.length) return;
     setState(() => _stagedAttachments.removeAt(index));
+    _stagedDraft.clear();
+    _stagedDraft.addAll(_stagedAttachments);
     _maintainInputFocus();
   }
 
@@ -651,6 +675,15 @@ class _ChatViewState extends State<ChatView> {
           if (_stagedAttachments.isNotEmpty)
             StagedAttachmentsPreview(
               attachments: _stagedAttachments,
+              onPreviewAttachment: (attachment) {
+                if (attachment.type != AttachmentType.image) return;
+                MediaPreviewDialog.show(
+                  context,
+                  title: attachment.name,
+                  bytes: attachment.bytes,
+                  path: attachment.path,
+                );
+              },
               onRemoveAttachment: _removeStagedAttachment,
             ),
           ChatInputBar(

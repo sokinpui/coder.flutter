@@ -5,6 +5,7 @@ import 'package:markdown_widget/markdown_widget.dart';
 
 import '../../core/theme/app_theme.dart';
 import 'collapsible_code_block.dart';
+import 'media_preview_dialog.dart';
 
 class MarkdownRenderer extends StatelessWidget {
   const MarkdownRenderer({
@@ -101,6 +102,35 @@ class MarkdownRenderer extends StatelessWidget {
                     language: language,
                     code: code,
                     searchPattern: searchPattern,
+                  ),
+                ),
+                TableConfig(
+                  wrapper: (table) => SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    child: table,
+                  ),
+                ),
+                ImgConfig(
+                  builder: (url, attributes) => GestureDetector(
+                    onTap: () => MediaPreviewDialog.show(
+                      context,
+                      title: attributes['alt'] ?? 'Image',
+                      path: url,
+                    ),
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          url,
+                          errorBuilder: (_, __, ___) => const Icon(
+                            Icons.broken_image_outlined,
+                            color: AppTheme.textMuted,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 ListConfig(

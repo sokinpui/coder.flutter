@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
@@ -108,9 +109,21 @@ class ChatInputBar extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      physics: const BouncingScrollPhysics(),
+                    child: ScrollConfiguration(
+                      behavior: ScrollConfiguration.of(context).copyWith(
+                        dragDevices: {
+                          PointerDeviceKind.touch,
+                          PointerDeviceKind.mouse,
+                          PointerDeviceKind.trackpad,
+                          PointerDeviceKind.stylus,
+                        },
+                        scrollbars: false,
+                      ),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        physics: const BouncingScrollPhysics(
+                          parent: AlwaysScrollableScrollPhysics(),
+                        ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -290,6 +303,7 @@ class ChatInputBar extends StatelessWidget {
                           ],
                         ],
                       ),
+                    ),
                     ),
                   ),
                   const SizedBox(width: 8),

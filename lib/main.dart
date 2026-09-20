@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import 'core/theme/app_theme.dart';
@@ -8,6 +9,18 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppTheme.initializeFonts();
   runApp(const MyApp());
+}
+
+class AppScrollBehavior extends MaterialScrollBehavior {
+  const AppScrollBehavior();
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.trackpad,
+        PointerDeviceKind.stylus,
+      };
 }
 
 class MyApp extends StatefulWidget {
@@ -40,6 +53,7 @@ class _MyAppState extends State<MyApp> {
         return MaterialApp(
           title: 'coder',
           debugShowCheckedModeBanner: false,
+          scrollBehavior: const AppScrollBehavior(),
           theme: AppTheme.lightTheme(),
           darkTheme: AppTheme.darkTheme(),
           themeMode: _coderState.themeMode,

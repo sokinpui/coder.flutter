@@ -15,14 +15,14 @@ class AppIconPainter extends CustomPainter {
     if (showBackground) {
       final bgRect = RRect.fromRectAndRadius(
         const Rect.fromLTWH(16, 16, 480, 480),
-        const Radius.circular(115),
+        const Radius.circular(116),
       );
 
       final bgPaint = Paint()
         ..shader = ui.Gradient.linear(
           const Offset(16, 16),
           const Offset(496, 496),
-          const [Color(0xFF161B24), Color(0xFF0C0E14)],
+          const [Color(0xFF131722), Color(0xFF0A0D14)],
         );
       canvas.drawRRect(bgRect, bgPaint);
 
@@ -33,101 +33,95 @@ class AppIconPainter extends CustomPainter {
           const Offset(60, 20),
           const Offset(450, 490),
           [
-            const Color(0xFF4C8DFF).withOpacity(0.55),
-            const Color(0xFF26B5CE).withOpacity(0.25),
-            const Color(0xFF7B61FF).withOpacity(0.15),
+            const Color(0xFF00F5FF).withOpacity(0.40),
+            const Color(0xFF6366F1).withOpacity(0.25),
             Colors.white.withOpacity(0.05),
           ],
-          [0.0, 0.45, 0.8, 1.0],
+          [0.0, 0.65, 1.0],
         );
       canvas.drawRRect(bgRect, borderPaint);
 
       final glowPaint = Paint()
         ..shader = ui.Gradient.radial(
           const Offset(256, 256),
-          200,
+          220,
           [
-            const Color(0xFF26B5CE).withOpacity(0.18),
-            const Color(0xFF4C8DFF).withOpacity(0.08),
+            const Color(0xFF0072FF).withOpacity(0.14),
             Colors.transparent,
           ],
-          [0.0, 0.5, 1.0],
         );
-      canvas.drawCircle(const Offset(256, 256), 200, glowPaint);
-
-      final dot1 = Paint()..color = const Color(0xFFFF5F56).withOpacity(0.85);
-      final dot2 = Paint()..color = const Color(0xFFFFBD2E).withOpacity(0.85);
-      final dot3 = Paint()..color = const Color(0xFF27C93F).withOpacity(0.85);
-      canvas.drawCircle(const Offset(105, 80), 5.5, dot1);
-      canvas.drawCircle(const Offset(125, 80), 5.5, dot2);
-      canvas.drawCircle(const Offset(145, 80), 5.5, dot3);
+      canvas.drawCircle(const Offset(256, 256), 220, glowPaint);
     }
 
-    final chevronPath = Path()
-      ..moveTo(132, 180)
-      ..lineTo(212, 256)
-      ..lineTo(132, 332);
+    final coreGlowPaint = Paint()
+      ..shader = ui.Gradient.radial(
+        const Offset(256, 256),
+        64,
+        [
+          const Color(0xFF00F5FF).withOpacity(0.22),
+          Colors.transparent,
+        ],
+      );
+    canvas.drawCircle(const Offset(256, 256), 64, coreGlowPaint);
 
-    final chevronPaint = Paint()
+    final cPath = Path()
+      ..moveTo(370, 140)
+      ..lineTo(220, 140)
+      ..lineTo(140, 220)
+      ..lineTo(140, 292)
+      ..lineTo(220, 372)
+      ..lineTo(370, 372);
+
+    final cGlowPaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 34
+      ..strokeWidth = 64
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
       ..shader = ui.Gradient.linear(
-        const Offset(132, 180),
-        const Offset(212, 332),
-        const [Color(0xFF38E1FF), Color(0xFF4C8DFF)],
-      );
-    canvas.drawPath(chevronPath, chevronPaint);
-
-    final cursorPath = Path()
-      ..moveTo(246, 332)
-      ..lineTo(342, 332);
-
-    final cursorPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 32
-      ..strokeCap = StrokeCap.round
-      ..shader = ui.Gradient.linear(
-        const Offset(246, 332),
-        const Offset(342, 332),
-        const [Color(0xFF4C8DFF), Color(0xFF8A63FF)],
-      );
-    canvas.drawPath(cursorPath, cursorPaint);
-
-    final sparkPath = Path()
-      ..moveTo(315, 155)
-      ..cubicTo(315, 182, 338, 205, 365, 205)
-      ..cubicTo(338, 205, 315, 228, 315, 255)
-      ..cubicTo(315, 228, 292, 205, 265, 205)
-      ..cubicTo(292, 205, 315, 182, 315, 155)
-      ..close();
-
-    final sparkPaint = Paint()
-      ..shader = ui.Gradient.linear(
-        const Offset(265, 155),
-        const Offset(365, 255),
-        const [Color(0xFFFFFFFF), Color(0xFF5FFFD7), Color(0xFF26B5CE)],
-        const [0.0, 0.4, 1.0],
-      );
-    canvas.drawPath(sparkPath, sparkPaint);
-
-    final smallSpark = Path()
-      ..moveTo(385, 132)
-      ..cubicTo(385, 143, 394, 152, 405, 152)
-      ..cubicTo(394, 152, 385, 161, 385, 172)
-      ..cubicTo(385, 161, 376, 152, 365, 152)
-      ..cubicTo(376, 152, 385, 143, 385, 132)
-      ..close();
-
-    final smallSparkPaint = Paint()
-      ..shader = ui.Gradient.linear(
-        const Offset(365, 132),
-        const Offset(405, 172),
-        const [Color(0xFFFFF9D2), Color(0xFFF2CC60), Color(0xFFFF9E79)],
+        const Offset(370, 130),
+        const Offset(140, 380),
+        [
+          const Color(0xFF00F5FF).withOpacity(0.20),
+          const Color(0xFF3B82F6).withOpacity(0.16),
+          const Color(0xFF8B5CF6).withOpacity(0.12),
+        ],
         const [0.0, 0.5, 1.0],
       );
-    canvas.drawPath(smallSpark, smallSparkPaint);
+    canvas.drawPath(cPath, cGlowPaint);
+
+    final cPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 52
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..shader = ui.Gradient.linear(
+        const Offset(370, 130),
+        const Offset(140, 380),
+        const [
+          Color(0xFF00F5FF),
+          Color(0xFF3B82F6),
+          Color(0xFF6366F1),
+          Color(0xFF8B5CF6),
+        ],
+        const [0.0, 0.35, 0.70, 1.0],
+      );
+    canvas.drawPath(cPath, cPaint);
+
+    final diamondPath = Path()
+      ..moveTo(256, 214)
+      ..lineTo(298, 256)
+      ..lineTo(256, 298)
+      ..lineTo(214, 256)
+      ..close();
+
+    final diamondFillPaint = Paint()
+      ..shader = ui.Gradient.linear(
+        const Offset(214, 214),
+        const Offset(298, 298),
+        const [Color(0xFFFFFFFF), Color(0xFF38E1FF), Color(0xFF2563EB)],
+        const [0.0, 0.45, 1.0],
+      );
+    canvas.drawPath(diamondPath, diamondFillPaint);
 
     canvas.restore();
   }

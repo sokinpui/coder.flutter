@@ -1,55 +1,37 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
   <defs>
     <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#161B24" />
-      <stop offset="100%" stop-color="#0C0E14" />
+      <stop offset="0%" stop-color="#131722" />
+      <stop offset="100%" stop-color="#0A0D14" />
     </linearGradient>
     <linearGradient id="border-grad" x1="10%" y1="0%" x2="90%" y2="100%">
-      <stop offset="0%" stop-color="#4C8DFF" stop-opacity="0.6" />
-      <stop offset="45%" stop-color="#26B5CE" stop-opacity="0.3" />
-      <stop offset="80%" stop-color="#7B61FF" stop-opacity="0.2" />
-      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.08" />
+      <stop offset="0%" stop-color="#00F5FF" stop-opacity="0.4" />
+      <stop offset="65%" stop-color="#6366F1" stop-opacity="0.25" />
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.05" />
     </linearGradient>
     <radialGradient id="glow-grad" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#26B5CE" stop-opacity="0.25" />
-      <stop offset="50%" stop-color="#4C8DFF" stop-opacity="0.1" />
+      <stop offset="0%" stop-color="#0072FF" stop-opacity="0.14" />
       <stop offset="100%" stop-color="#000000" stop-opacity="0" />
     </radialGradient>
-    <linearGradient id="chevron-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#38E1FF" />
-      <stop offset="100%" stop-color="#4C8DFF" />
+    <radialGradient id="diamond-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00F5FF" stop-opacity="0.25" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="c-grad" x1="85%" y1="15%" x2="25%" y2="85%">
+      <stop offset="0%" stop-color="#00F5FF" />
+      <stop offset="35%" stop-color="#3B82F6" />
+      <stop offset="70%" stop-color="#6366F1" />
+      <stop offset="100%" stop-color="#8B5CF6" />
     </linearGradient>
-    <linearGradient id="cursor-grad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#4C8DFF" />
-      <stop offset="100%" stop-color="#8A63FF" />
-    </linearGradient>
-    <linearGradient id="spark-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="diamond-grad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#FFFFFF" />
-      <stop offset="40%" stop-color="#5FFFD7" />
-      <stop offset="100%" stop-color="#26B5CE" />
+      <stop offset="45%" stop-color="#38E1FF" />
+      <stop offset="100%" stop-color="#2563EB" />
     </linearGradient>
-    <linearGradient id="small-spark-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#FFF9D2" />
-      <stop offset="50%" stop-color="#F2CC60" />
-      <stop offset="100%" stop-color="#FF9E79" />
-    </linearGradient>
-    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="6" result="blur" />
-      <feComposite in="SourceGraphic" in2="blur" operator="over" />
-    </filter>
   </defs>
-
-  <rect x="16" y="16" width="480" height="480" rx="115" fill="url(#bg-grad)" stroke="url(#border-grad)" stroke-width="3" />
-  <circle cx="256" cy="256" r="200" fill="url(#glow-grad)" />
-
-  <circle cx="105" cy="80" r="5.5" fill="#FF5F56" opacity="0.85" />
-  <circle cx="125" cy="80" r="5.5" fill="#FFBD2E" opacity="0.85" />
-  <circle cx="145" cy="80" r="5.5" fill="#27C93F" opacity="0.85" />
-
-  <g filter="url(#glow)">
-    <path d="M 132 180 L 212 256 L 132 332" fill="none" stroke="url(#chevron-grad)" stroke-width="34" stroke-linecap="round" stroke-linejoin="round" />
-    <line x1="246" y1="332" x2="342" y2="332" stroke="url(#cursor-grad)" stroke-width="32" stroke-linecap="round" />
-    <path d="M 315 155 C 315 182 338 205 365 205 C 338 205 315 228 315 255 C 315 228 292 205 265 205 C 292 205 315 182 315 155 Z" fill="url(#spark-grad)" />
-    <path d="M 385 132 C 385 143 394 152 405 152 C 394 152 385 161 385 172 C 385 161 376 152 365 152 C 376 152 385 143 385 132 Z" fill="url(#small-spark-grad)" />
-  </g>
+  <rect x="16" y="16" width="480" height="480" rx="116" fill="url(#bg-grad)" stroke="url(#border-grad)" stroke-width="2.5" />
+  <circle cx="256" cy="256" r="220" fill="url(#glow-grad)" />
+  <circle cx="256" cy="256" r="64" fill="url(#diamond-glow)" />
+  <path d="M 370 140 L 220 140 L 140 220 L 140 292 L 220 372 L 370 372" fill="none" stroke="url(#c-grad)" stroke-width="52" stroke-linecap="round" stroke-linejoin="round" />
+  <polygon points="256,214 298,256 256,298 214,256" fill="url(#diamond-grad)" />
 </svg>

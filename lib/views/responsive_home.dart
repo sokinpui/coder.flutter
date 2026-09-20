@@ -85,13 +85,6 @@ class _ResponsiveHomeState extends State<ResponsiveHome> {
             tooltip: 'Find in chat (Cmd+F / Ctrl+F)',
             onPressed: widget.state.toggleSearch,
           ),
-          IconButton(
-            icon: Icon(
-              isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-            ),
-            tooltip: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
-            onPressed: widget.state.toggleTheme,
-          ),
           HoverAnimatedButton(
             tooltip: 'New Chat',
             hoverScale: 1.15,
@@ -158,18 +151,14 @@ class _ResponsiveHomeState extends State<ResponsiveHome> {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
-          IconButton(
-            icon: Icon(
-              widget.state.isSidebarVisible
-                  ? Icons.view_sidebar_outlined
-                  : Icons.menu,
+          if (!widget.state.isSidebarVisible) ...[
+            IconButton(
+              icon: const Icon(Icons.view_sidebar_outlined),
+              tooltip: 'Expand Sidebar',
+              onPressed: widget.state.toggleSidebar,
             ),
-            tooltip: widget.state.isSidebarVisible
-                ? 'Collapse Sidebar'
-                : 'Expand Sidebar',
-            onPressed: widget.state.toggleSidebar,
-          ),
-          const SizedBox(width: 8),
+            const SizedBox(width: 8),
+          ],
           Expanded(
             child: Align(
               alignment: Alignment.centerLeft,
@@ -213,15 +202,9 @@ class _ResponsiveHomeState extends State<ResponsiveHome> {
             tooltip: 'Find in chat (Cmd+F / Ctrl+F)',
             onPressed: widget.state.toggleSearch,
           ),
-          IconButton(
-            icon: Icon(
-              isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-            ),
-            tooltip: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
-            onPressed: widget.state.toggleTheme,
-          ),
           HoverAnimatedButton(
             tooltip: 'New Chat',
+            hoverScale: 1.15,
             onTap: widget.state.newChat,
             child: const Padding(
               padding: EdgeInsets.all(8),

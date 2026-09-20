@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/utils/responsive.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_icon_widget.dart';
 import '../../core/widgets/hover_animated_button.dart';
@@ -54,33 +55,35 @@ class SessionSidebar extends StatelessWidget {
   Widget _buildHeader(BuildContext context) {
     return SafeArea(
       bottom: false,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Container(
+        height: 48,
+        padding: const EdgeInsets.only(left: 16, right: 8),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Row(
-              children: [
-                AppIconWidget(size: 22),
-                SizedBox(width: 8),
-                Text(
-                  'CODER',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.5,
-                    fontSize: 16,
-                  ),
-                ),
-              ],
+            const AppIconWidget(size: 22),
+            const SizedBox(width: 8),
+            const Text(
+              'CODER',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.5,
+                fontSize: 16,
+              ),
             ),
+            const Spacer(),
             IconButton(
-              icon: const Icon(Icons.settings_outlined, size: 20),
-              tooltip: 'Server Settings',
+              icon: const Icon(
+                Icons.view_sidebar_outlined,
+                size: 18,
+                color: AppTheme.textMuted,
+              ),
+              tooltip: 'Collapse Sidebar',
               onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (_) => ServerSettingsDialog(state: state),
-                );
+                if (Responsive.isCompact(context)) {
+                  Navigator.of(context).maybePop();
+                  return;
+                }
+                state.toggleSidebar();
               },
             ),
           ],
@@ -179,15 +182,40 @@ class SessionSidebar extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              isConnected
-                  ? '${state.useTls ? 'wss' : 'ws'}://${state.serverHost}:${state.serverPort}'
-                  : 'Disconnected',
-              style: const TextStyle(color: AppTheme.textMuted, fontSize: 11),
-              overflow: TextOverflow.ellipsis,
+            child: InkWell(
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (_) => ServerSettingsDialog(state: state),
+                );
+              },
+              borderRadius: BorderRadius.circular(4),
+              child: Text(
+                isConnected
+                    ? '${state.useTls ? 'wss' : 'ws'}://${state.serverHost}:${state.serverPort}'
+                    : 'Disconnected',
+                style: const TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ),
           IconButton(
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(
+              Icons.settings_outlined,
+              size: 16,
+              color: AppTheme.textMuted,
+            ),
+            tooltip: 'Server Settings',
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (_) => ServerSettingsDialog(state: state),
+              );
+            },
+          ),
+          IconButton(
+            visualDensity: VisualDensity.compact,
             icon: Icon(
               isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
               size: 16,
@@ -196,6 +224,7 @@ class SessionSidebar extends StatelessWidget {
             onPressed: state.toggleTheme,
           ),
           IconButton(
+            visualDensity: VisualDensity.compact,
             icon: const Icon(
               Icons.refresh,
               size: 16,

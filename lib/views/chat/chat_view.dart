@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/services/clipboard_service.dart';
+import '../../core/utils/chat_selection_tracker.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/staged_attachment.dart';
 import 'media_preview_dialog.dart';
@@ -43,6 +44,7 @@ class _ChatViewState extends State<ChatView> {
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _inputFocusNode = FocusNode();
+  final FocusNode _chatFocusNode = FocusNode();
   final FocusNode _searchFocusNode = FocusNode();
   final ClipboardService _clipboardService = ClipboardService.create();
 
@@ -132,6 +134,7 @@ class _ChatViewState extends State<ChatView> {
     _searchController.dispose();
     _searchFocusNode.dispose();
     _scrollController.dispose();
+    _chatFocusNode.dispose();
     _inputFocusNode.dispose();
     super.dispose();
   }
@@ -495,6 +498,24 @@ class _ChatViewState extends State<ChatView> {
       _maintainInputFocus();
     }
 
+    final isCopy =
+        (event.logicalKey == LogicalKeyboardKey.keyC && isModifierActive) ||
+        event.logicalKey == LogicalKeyboardKey.copy;
+    if (isCopy) {
+      final primaryFocus = FocusManager.instance.primaryFocus;
+      final editable = primaryFocus?.context
+          ?.findAncestorStateOfType<EditableTextState>();
+      final isFieldTextSelected =
+          editable != null && !editable.textEditingValue.selection.isCollapsed;
+
+      if (!isFieldTextSelected && ChatSelectionTracker.hasSelection) {
+        Clipboard.setData(
+          ClipboardData(text: ChatSelectionTracker.selectedText!),
+        );
+        return KeyEventResult.handled;
+      }
+    }
+
     final isBackspaceOrDelete =
         event.logicalKey == LogicalKeyboardKey.backspace ||
         event.logicalKey == LogicalKeyboardKey.delete;
@@ -531,6 +552,8 @@ class _ChatViewState extends State<ChatView> {
     }
 
     return Focus(
+      focusNode: _chatFocusNode,
+      autofocus: true,
       onKeyEvent: _handleKeyEvent,
       child: Column(
         children: [

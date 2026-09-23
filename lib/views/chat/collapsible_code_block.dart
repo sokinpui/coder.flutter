@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/chat_selection_tracker.dart';
 import '../../core/widgets/hover_animated_button.dart';
 import 'code_highlighter.dart';
 
@@ -34,6 +35,12 @@ class _CollapsibleCodeBlockState extends State<CollapsibleCodeBlock> {
   void didUpdateWidget(CollapsibleCodeBlock oldWidget) {
     super.didUpdateWidget(oldWidget);
     _checkSearchExpansion();
+  }
+
+  @override
+  void dispose() {
+    ChatSelectionTracker.clearSelection(this);
+    super.dispose();
   }
 
   void _checkSearchExpansion() {
@@ -174,6 +181,18 @@ class _CollapsibleCodeBlockState extends State<CollapsibleCodeBlock> {
                   isDark: isDark,
                   searchPattern: widget.searchPattern,
                 ),
+                onSelectionChanged: (selection, cause) {
+                  if (selection.isCollapsed) {
+                    ChatSelectionTracker.clearSelection(this);
+                    return;
+                  }
+                  final expanded = CodeHighlighter.expandTabs(widget.code);
+                  final selectedText = ChatSelectionTracker.extractSelectedText(
+                    expanded,
+                    selection,
+                  );
+                  ChatSelectionTracker.setSelection(this, selectedText);
+                },
               ),
             ),
             secondChild: const SizedBox.shrink(),

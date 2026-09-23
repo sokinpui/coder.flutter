@@ -42,26 +42,18 @@ class AppIconPainter extends CustomPainter {
       canvas.drawRRect(bgRect, borderPaint);
 
       final glowPaint = Paint()
-        ..shader = ui.Gradient.radial(
-          const Offset(256, 256),
-          220,
-          [
-            const Color(0xFF0072FF).withOpacity(0.14),
-            Colors.transparent,
-          ],
-        );
+        ..shader = ui.Gradient.radial(const Offset(256, 256), 220, [
+          const Color(0xFF0072FF).withOpacity(0.14),
+          Colors.transparent,
+        ]);
       canvas.drawCircle(const Offset(256, 256), 220, glowPaint);
     }
 
     final coreGlowPaint = Paint()
-      ..shader = ui.Gradient.radial(
-        const Offset(256, 256),
-        64,
-        [
-          const Color(0xFF00F5FF).withOpacity(0.22),
-          Colors.transparent,
-        ],
-      );
+      ..shader = ui.Gradient.radial(const Offset(256, 256), 64, [
+        const Color(0xFF00F5FF).withOpacity(0.22),
+        Colors.transparent,
+      ]);
     canvas.drawCircle(const Offset(256, 256), 64, coreGlowPaint);
 
     final cPath = Path()

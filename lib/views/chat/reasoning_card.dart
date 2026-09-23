@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/chat_selection_tracker.dart';
 
 class ReasoningCard extends StatefulWidget {
   const ReasoningCard({
@@ -18,6 +19,12 @@ class ReasoningCard extends StatefulWidget {
 
 class _ReasoningCardState extends State<ReasoningCard> {
   bool _isExpanded = false;
+
+  @override
+  void dispose() {
+    ChatSelectionTracker.clearSelection(this);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -85,6 +92,17 @@ class _ReasoningCardState extends State<ReasoningCard> {
                   fontSize: 12,
                   height: 1.4,
                 ),
+                onSelectionChanged: (selection, cause) {
+                  if (selection.isCollapsed) {
+                    ChatSelectionTracker.clearSelection(this);
+                    return;
+                  }
+                  final selectedText = ChatSelectionTracker.extractSelectedText(
+                    widget.reasoning,
+                    selection,
+                  );
+                  ChatSelectionTracker.setSelection(this, selectedText);
+                },
               ),
             ),
         ],

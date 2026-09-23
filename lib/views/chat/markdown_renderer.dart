@@ -4,10 +4,11 @@ import 'package:markdown/markdown.dart' as m;
 import 'package:markdown_widget/markdown_widget.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/chat_selection_tracker.dart';
 import 'collapsible_code_block.dart';
 import 'media_preview_dialog.dart';
 
-class MarkdownRenderer extends StatelessWidget {
+class MarkdownRenderer extends StatefulWidget {
   const MarkdownRenderer({
     super.key,
     required this.content,
@@ -20,6 +21,17 @@ class MarkdownRenderer extends StatelessWidget {
   final RegExp? searchPattern;
   final String? messageId;
   final int? activeSearchOccurrenceInMessage;
+
+  @override
+  State<MarkdownRenderer> createState() => _MarkdownRendererState();
+}
+
+class _MarkdownRendererState extends State<MarkdownRenderer> {
+  @override
+  void dispose() {
+    ChatSelectionTracker.clearSelection(this);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,10 +51,10 @@ class MarkdownRenderer extends StatelessWidget {
       ],
       textGenerator: (node, config, visitor) => CustomSearchTextNode(
         node.textContent,
-        searchPattern,
-        messageId,
+        widget.searchPattern,
+        widget.messageId,
         isDark,
-        activeSearchOccurrenceInMessage,
+        widget.activeSearchOccurrenceInMessage,
         occurrenceCounter,
       ),
     );
@@ -101,7 +113,7 @@ class MarkdownRenderer extends StatelessWidget {
                   wrapper: (child, code, language) => CollapsibleCodeBlock(
                     language: language,
                     code: code,
-                    searchPattern: searchPattern,
+                    searchPattern: widget.searchPattern,
                   ),
                 ),
                 TableConfig(
@@ -164,8 +176,11 @@ class MarkdownRenderer extends StatelessWidget {
             );
 
     return SelectionArea(
+      onSelectionChanged: (selectedContent) {
+        ChatSelectionTracker.setSelection(this, selectedContent?.plainText);
+      },
       child: MarkdownBlock(
-        data: content,
+        data: widget.content,
         config: markdownConfig,
         generator: generator,
       ),

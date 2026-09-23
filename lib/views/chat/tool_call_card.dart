@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/chat_selection_tracker.dart';
 import '../../core/widgets/hover_animated_button.dart';
 
 class ToolCallCard extends StatefulWidget {
@@ -41,6 +42,12 @@ class _ToolCallCardState extends State<ToolCallCard> {
   void didUpdateWidget(ToolCallCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     _checkSearchExpansion();
+  }
+
+  @override
+  void dispose() {
+    ChatSelectionTracker.clearSelection(this);
+    super.dispose();
   }
 
   void _checkSearchExpansion() {
@@ -217,6 +224,21 @@ class _ToolCallCardState extends State<ToolCallCard> {
                                   : AppTheme.lightTextMain,
                               height: 1.4,
                             ),
+                            onSelectionChanged: (selection, cause) {
+                              if (selection.isCollapsed) {
+                                ChatSelectionTracker.clearSelection(this);
+                                return;
+                              }
+                              final selectedText =
+                                  ChatSelectionTracker.extractSelectedText(
+                                    widget.content,
+                                    selection,
+                                  );
+                              ChatSelectionTracker.setSelection(
+                                this,
+                                selectedText,
+                              );
+                            },
                           ),
                         ),
                       ),

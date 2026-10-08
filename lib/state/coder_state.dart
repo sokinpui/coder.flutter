@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
@@ -29,6 +30,7 @@ class CoderState extends ChangeNotifier {
   bool _isSidebarVisible = true;
   String _activeModel = 'default';
   String _sessionTitle = 'New Chat';
+  String? _currentSessionFilename;
   List<String> _availableModels = [];
   bool _isSearchVisible = false;
   List<String> _contextFiles = [];
@@ -44,8 +46,11 @@ class CoderState extends ChangeNotifier {
   Timer? _reconnectTimer;
   int _reconnectAttempts = 0;
   bool _isAutoReconnecting = false;
-  Timer? _chunkThrottleTimer;
-  bool _hasPendingChunkNotification = false;
+  String _pendingContent = '';
+  String _pendingReasoning = '';
+  Timer? _smoothStreamTimer;
+  bool _isStreamDonePending = false;
+  int _streamTokenCount = 0;
   bool _hasAttemptedConnection = false;
 
   String get serverHost => _serverHost;
@@ -56,6 +61,7 @@ class CoderState extends ChangeNotifier {
   bool get isSidebarVisible => _isSidebarVisible;
   String get activeModel => _activeModel;
   String get sessionTitle => _sessionTitle;
+  String? get currentSessionFilename => _currentSessionFilename;
   List<String> get availableModels => _availableModels;
   List<String> get contextFiles => List.unmodifiable(_contextFiles);
   List<String> get contextDocuments => List.unmodifiable(_contextDocuments);
@@ -146,6 +152,7 @@ class CoderState extends ChangeNotifier {
   }
 
   void _handleUnexpectedDisconnect() {
+    _flushSmoothStream();
     if (_connectionStatus == ConnectionStateStatus.disconnected) return;
     _connectionStatus = ConnectionStateStatus.disconnected;
     _isAutoReconnecting = true;
@@ -268,13 +275,18 @@ class CoderState extends ChangeNotifier {
         }
       }
       _sessionTitle = 'New Chat';
+      _currentSessionFilename = null;
       _messages.clear();
       notifyListeners();
     } catch (_) {}
   }
 
   Future<void> newChat() async {
+    _flushSmoothStream();
+    _isStreamDonePending = false;
+    _streamTokenCount = 0;
     _isSearchVisible = false;
+    _currentSessionFilename = null;
     _isGenerating = false;
     _tokenCount = 0;
     _messages.clear();
@@ -294,6 +306,9 @@ class CoderState extends ChangeNotifier {
     if (_isGenerating) {
       return;
     }
+    _flushSmoothStream();
+    _isStreamDonePending = false;
+    _streamTokenCount = 0;
     _isSearchVisible = false;
 
     final effectivePrompt = prompt.isEmpty && hasImages
@@ -356,6 +371,9 @@ class CoderState extends ChangeNotifier {
     try {
       await _client.request('session/cancel');
     } catch (_) {}
+    _flushSmoothStream();
+    _isStreamDonePending = false;
+    _streamTokenCount = 0;
     _isGenerating = false;
     for (final m in _messages) {
       m.isGenerating = false;
@@ -405,6 +423,9 @@ class CoderState extends ChangeNotifier {
     if (_isGenerating) {
       return;
     }
+    _flushSmoothStream();
+    _isStreamDonePending = false;
+    _streamTokenCount = 0;
     _isSearchVisible = false;
     final index = _messages.indexWhere((m) => m.id == messageId);
     if (index == -1) {
@@ -775,6 +796,7 @@ class CoderState extends ChangeNotifier {
     try {
       final res = await _client.request('history/load', {'filename': filename});
       if (res is Map) {
+        _currentSessionFilename = filename;
         _sessionTitle = res['title'] as String? ?? 'Loaded Chat';
         if (res.containsKey('tokenCount')) {
           _tokenCount = (res['tokenCount'] as num?)?.toInt() ?? 0;
@@ -807,12 +829,17 @@ class CoderState extends ChangeNotifier {
     if (method == 'session/chunk' && params is Map) {
       final content = params['content'] as String? ?? '';
       final reasoning = params['reasoningContent'] as String? ?? '';
-      _notifyChunk();
       final done = params['done'] as bool? ?? false;
       final tokenCount = (params['tokenCount'] as num?)?.toInt();
       final error = params['error'] as String?;
       final toolCall = params['toolCall'] as Map?;
       final toolResult = params['toolResult'] as Map?;
+
+      if (toolCall != null ||
+          toolResult != null ||
+          (error != null && error.isNotEmpty)) {
+        _flushSmoothStream();
+      }
 
       if (toolCall != null) {
         final callId = toolCall['call_id']?.toString();
@@ -861,45 +888,24 @@ class CoderState extends ChangeNotifier {
         );
       }
 
-      if (content.isNotEmpty || reasoning.isNotEmpty) {
-        if (_messages.isEmpty ||
-            _messages.last.author != MessageAuthor.assistant) {
-          _messages.add(
-            ChatMessage(
-              id: UniqueKey().toString(),
-              author: MessageAuthor.assistant,
-              content: '',
-              reasoning: '',
-              isGenerating: true,
-            ),
-          );
-        }
-        final last = _messages.last;
-        if (content.isNotEmpty) {
-          last.content += content;
-        }
-        if (reasoning.isNotEmpty) {
-          last.reasoning += reasoning;
-        }
+      if (content.isNotEmpty) {
+        _pendingContent += content;
+      }
+      if (reasoning.isNotEmpty) {
+        _pendingReasoning += reasoning;
       }
 
       if (done) {
-        _isGenerating = false;
+        _isStreamDonePending = true;
         if (tokenCount != null && tokenCount > 0) {
-          _tokenCount = tokenCount;
+          _streamTokenCount = tokenCount;
         }
-        for (final m in _messages) {
-          m.isGenerating = false;
-        }
-        if (_messages.isNotEmpty &&
-            _messages.last.author == MessageAuthor.assistant &&
-            _messages.last.content.isEmpty &&
-            _messages.last.reasoning.isEmpty) {
-          _messages.removeLast();
-        }
-        fetchContext();
-        fetchHistory();
-      } else if (error != null && error.isNotEmpty) {
+      }
+
+      if (error != null && error.isNotEmpty) {
+        _flushSmoothStream();
+        _isGenerating = false;
+        _isStreamDonePending = false;
         for (final m in _messages) {
           m.isGenerating = false;
         }
@@ -918,9 +924,12 @@ class CoderState extends ChangeNotifier {
         }
         fetchContext();
         fetchHistory();
+        notifyListeners();
+        return;
       }
-      _flushChunkNotifications();
-      notifyListeners();
+
+      _ensureSmoothStreamTimer();
+      return;
       return;
     }
 
@@ -943,27 +952,124 @@ class CoderState extends ChangeNotifier {
     }
   }
 
-  void _notifyChunk() {
-    if (_chunkThrottleTimer != null && _chunkThrottleTimer!.isActive) {
-      _hasPendingChunkNotification = true;
+  void _ensureSmoothStreamTimer() {
+    if (_smoothStreamTimer != null && _smoothStreamTimer!.isActive) {
       return;
     }
-    notifyListeners();
-    _chunkThrottleTimer = Timer(const Duration(milliseconds: 32), () {
-      if (!_hasPendingChunkNotification) return;
-      _hasPendingChunkNotification = false;
-      notifyListeners();
-    });
+    _smoothStreamTimer = Timer.periodic(
+      const Duration(milliseconds: 20),
+      _onSmoothStreamTick,
+    );
+    _onSmoothStreamTick(_smoothStreamTimer!);
   }
 
-  void _flushChunkNotifications() {
-    _chunkThrottleTimer?.cancel();
-    _hasPendingChunkNotification = false;
+  void _onSmoothStreamTick(Timer timer) {
+    if (_pendingReasoning.isNotEmpty || _pendingContent.isNotEmpty) {
+      if (_messages.isEmpty ||
+          _messages.last.author != MessageAuthor.assistant) {
+        _messages.add(
+          ChatMessage(
+            id: UniqueKey().toString(),
+            author: MessageAuthor.assistant,
+            content: '',
+            reasoning: '',
+            isGenerating: true,
+          ),
+        );
+      }
+    }
+
+    var didUpdate = false;
+    if (_messages.isNotEmpty &&
+        _messages.last.author == MessageAuthor.assistant) {
+      final last = _messages.last;
+
+      if (_pendingReasoning.isNotEmpty) {
+        final step = _calculateStep(_pendingReasoning.length);
+        final safeLen = _safeSubstringLength(_pendingReasoning, step);
+        final chunk = _pendingReasoning.substring(0, safeLen);
+        _pendingReasoning = _pendingReasoning.substring(safeLen);
+        last.reasoning += chunk;
+        didUpdate = true;
+      } else if (_pendingContent.isNotEmpty) {
+        final step = _calculateStep(_pendingContent.length);
+        final safeLen = _safeSubstringLength(_pendingContent, step);
+        final chunk = _pendingContent.substring(0, safeLen);
+        _pendingContent = _pendingContent.substring(safeLen);
+        last.content += chunk;
+        didUpdate = true;
+      }
+    }
+
+    final hasPending =
+        _pendingReasoning.isNotEmpty || _pendingContent.isNotEmpty;
+
+    if (!hasPending && _isStreamDonePending) {
+      _smoothStreamTimer?.cancel();
+      _smoothStreamTimer = null;
+      _isStreamDonePending = false;
+      _isGenerating = false;
+      if (_streamTokenCount > 0) {
+        _tokenCount = _streamTokenCount;
+        _streamTokenCount = 0;
+      }
+      for (final m in _messages) {
+        m.isGenerating = false;
+      }
+      if (_messages.isNotEmpty &&
+          _messages.last.author == MessageAuthor.assistant &&
+          _messages.last.content.isEmpty &&
+          _messages.last.reasoning.isEmpty) {
+        _messages.removeLast();
+      }
+      fetchContext();
+      fetchHistory();
+      notifyListeners();
+      return;
+    }
+
+    if (!hasPending && !_isStreamDonePending) {
+      _smoothStreamTimer?.cancel();
+      _smoothStreamTimer = null;
+      if (didUpdate) {
+        notifyListeners();
+      }
+      return;
+    }
+
+    if (didUpdate) {
+      notifyListeners();
+    }
+  }
+
+  int _calculateStep(int backlogLength) {
+    if (backlogLength <= 0) return 0;
+    if (backlogLength <= 8) return 1;
+    if (backlogLength <= 20) return 2;
+    if (backlogLength <= 50) return 3;
+    if (backlogLength <= 120) return 5;
+    return math.min(backlogLength, (backlogLength / 20).ceil());
+  }
+
+  int _safeSubstringLength(String text, int desiredLength) {
+    var len = desiredLength.clamp(0, text.length);
+    if (len > 0 && len < text.length) {
+      final codeUnit = text.codeUnitAt(len - 1);
+      if (codeUnit >= 0xD800 && codeUnit <= 0xDBFF) {
+        len++;
+      }
+    }
+    return len;
+  }
+
+  void _flushSmoothStream() {
+    _smoothStreamTimer?.cancel();
+    _smoothStreamTimer = null;
   }
 
   @override
   void dispose() {
-    _chunkThrottleTimer?.cancel();
+    _flushSmoothStream();
     _reconnectTimer?.cancel();
     _client.disconnect();
     super.dispose();

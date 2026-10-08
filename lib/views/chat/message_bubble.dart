@@ -167,6 +167,9 @@ class _MessageBubbleState extends State<MessageBubble> {
                     ReasoningCard(
                       reasoning: widget.message.reasoning,
                       isDark: isDark,
+                      isGenerating:
+                          widget.message.isGenerating &&
+                          widget.message.content.isEmpty,
                     ),
                   if (_isEditing)
                     _buildInlineEditor(context, isDark)
@@ -181,8 +184,11 @@ class _MessageBubbleState extends State<MessageBubble> {
                       searchPattern: widget.searchPattern,
                       activeSearchOccurrenceInMessage:
                           widget.activeSearchOccurrence,
+                      isGenerating: widget.message.isGenerating,
                     ),
                   if (widget.message.isGenerating &&
+                      widget.message.reasoning.isEmpty &&
+                      widget.message.content.isEmpty &&
                       !isToolCall &&
                       !isToolResult)
                     const Padding(

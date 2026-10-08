@@ -6,6 +6,7 @@ import 'package:markdown_widget/markdown_widget.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/chat_selection_tracker.dart';
 import 'collapsible_code_block.dart';
+import 'streaming_cursor.dart';
 import 'media_preview_dialog.dart';
 
 class MarkdownRenderer extends StatefulWidget {
@@ -15,12 +16,14 @@ class MarkdownRenderer extends StatefulWidget {
     this.searchPattern,
     this.messageId,
     this.activeSearchOccurrenceInMessage,
+    this.isGenerating = false,
   });
 
   final String content;
   final RegExp? searchPattern;
   final String? messageId;
   final int? activeSearchOccurrenceInMessage;
+  final bool isGenerating;
 
   @override
   State<MarkdownRenderer> createState() => _MarkdownRendererState();
@@ -179,10 +182,17 @@ class _MarkdownRendererState extends State<MarkdownRenderer> {
       onSelectionChanged: (selectedContent) {
         ChatSelectionTracker.setSelection(this, selectedContent?.plainText);
       },
-      child: MarkdownBlock(
-        data: widget.content,
-        config: markdownConfig,
-        generator: generator,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          MarkdownBlock(
+            data: widget.content,
+            config: markdownConfig,
+            generator: generator,
+          ),
+          if (widget.isGenerating) const StreamingCursor(),
+        ],
       ),
     );
   }

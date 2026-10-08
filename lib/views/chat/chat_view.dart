@@ -1,10 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/rendering.dart';
 
 import '../../core/services/clipboard_service.dart';
 import '../../core/utils/chat_selection_tracker.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/hover_animated_button.dart';
 import '../../models/staged_attachment.dart';
 import 'media_preview_dialog.dart';
 import '../settings/context_dialog.dart';
@@ -55,6 +57,9 @@ class _ChatViewState extends State<ChatView> {
   RegExp? _activeSearchPattern;
   bool _isPicking = false;
   String? _searchError;
+  bool _isAutoScrolling = false;
+  bool _stickToBottom = true;
+  bool _showScrollToBottom = false;
   final List<StagedAttachment> _stagedAttachments = [];
   int _lastMessageCount = 0;
 
@@ -117,6 +122,14 @@ class _ChatViewState extends State<ChatView> {
       return;
     }
 
+    if (oldWidget.state.currentSessionFilename !=
+            widget.state.currentSessionFilename ||
+        (oldWidget.state.messages.isEmpty &&
+            widget.state.messages.isNotEmpty)) {
+      _stickToBottom = true;
+      _showScrollToBottom = false;
+    }
+
     if (oldWidget.state.isSearchVisible && !widget.state.isSearchVisible) {
       _searchController.clear();
       setState(() {
@@ -164,20 +177,73 @@ class _ChatViewState extends State<ChatView> {
   }
 
   void _autoScrollToBottomIfAppropriate() {
+    if (!_stickToBottom) return;
     if (widget.state.isSearchVisible) return;
     if (!_scrollController.hasClients) return;
     if (_scrollController.position.isScrollingNotifier.value) return;
 
-    final maxScroll = _scrollController.position.maxScrollExtent;
-    final currentScroll = _scrollController.offset;
-    final isNearBottom = (maxScroll - currentScroll) <= 120.0;
-    if (!isNearBottom) return;
+    final target = _scrollController.position.maxScrollExtent;
+    final distance = target - _scrollController.offset;
+    if (distance <= 0.5) return;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_scrollController.hasClients) return;
+      if (!mounted || !_scrollController.hasClients || !_stickToBottom) return;
       if (_scrollController.position.isScrollingNotifier.value) return;
-      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+
+      final currentTarget = _scrollController.position.maxScrollExtent;
+      final currentDistance = currentTarget - _scrollController.offset;
+      if (currentDistance <= 0.5) return;
+
+      if (currentDistance <= 64.0) {
+        _scrollController.jumpTo(currentTarget);
+        return;
+      }
+
+      if (_isAutoScrolling) return;
+      _isAutoScrolling = true;
+      _scrollController
+          .animateTo(
+            target,
+            duration: const Duration(milliseconds: 120),
+            curve: Curves.easeOutCubic,
+          )
+          .whenComplete(() {
+            _isAutoScrolling = false;
+          });
     });
+  }
+
+  void _handleScrollNotification(ScrollNotification notification) {
+    if (notification is UserScrollNotification) {
+      if (notification.direction == ScrollDirection.forward) {
+        _stickToBottom = false;
+        if (!_showScrollToBottom) {
+          setState(() => _showScrollToBottom = true);
+        }
+      } else if (notification.direction == ScrollDirection.reverse) {
+        if (notification.metrics.extentAfter <= 36.0) {
+          _stickToBottom = true;
+          if (_showScrollToBottom) {
+            setState(() => _showScrollToBottom = false);
+          }
+        }
+      }
+    } else if (notification is ScrollUpdateNotification) {
+      if (notification.metrics.extentAfter <= 24.0) {
+        if (!_stickToBottom) {
+          _stickToBottom = true;
+          if (_showScrollToBottom) {
+            setState(() => _showScrollToBottom = false);
+          }
+        }
+      } else if (notification.dragDetails != null &&
+          (notification.scrollDelta ?? 0) < 0) {
+        _stickToBottom = false;
+        if (!_showScrollToBottom) {
+          setState(() => _showScrollToBottom = true);
+        }
+      }
+    }
   }
 
   void _onSearchChanged() {
@@ -310,6 +376,9 @@ class _ChatViewState extends State<ChatView> {
     final pdfs = _stagedAttachments
         .where((a) => a.type == AttachmentType.pdf)
         .toList();
+
+    _stickToBottom = true;
+    setState(() => _showScrollToBottom = false);
 
     _draftPrompt = '';
     _stagedDraft.clear();
@@ -544,7 +613,7 @@ class _ChatViewState extends State<ChatView> {
     if (messages.length != _lastMessageCount) {
       final wasNewMessage = messages.length > _lastMessageCount;
       _lastMessageCount = messages.length;
-      if (wasNewMessage && !widget.state.isSearchVisible) {
+      if (wasNewMessage && !widget.state.isSearchVisible && _stickToBottom) {
         _scrollToBottom();
       }
     } else if (widget.state.isGenerating && !widget.state.isSearchVisible) {
@@ -637,62 +706,110 @@ class _ChatViewState extends State<ChatView> {
                     onAttachImage: _handleAttachImage,
                     onAddFileOrPdf: _handleAddFileOrPdf,
                   )
-                : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    itemCount: messages.length,
-                    itemBuilder: (context, index) {
-                      final msg = messages[index];
-                      final key = _messageKeys.putIfAbsent(
-                        msg.id,
-                        () => GlobalKey(),
-                      );
-                      final activeOcc = _searchOccurrences.isNotEmpty
-                          ? _searchOccurrences[_currentMatchIndex]
-                          : null;
-                      final isThisMsgActive = activeOcc?.messageIndex == index;
+                : Stack(
+                    children: [
+                      NotificationListener<ScrollNotification>(
+                        onNotification: (notification) {
+                          _handleScrollNotification(notification);
+                          return false;
+                        },
+                        child: ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          itemCount: messages.length,
+                          itemBuilder: (context, index) {
+                            final msg = messages[index];
+                            final key = _messageKeys.putIfAbsent(
+                              msg.id,
+                              () => GlobalKey(),
+                            );
+                            final activeOcc = _searchOccurrences.isNotEmpty
+                                ? _searchOccurrences[_currentMatchIndex]
+                                : null;
+                            final isThisMsgActive =
+                                activeOcc?.messageIndex == index;
 
-                      return MessageBubble(
-                        key: key,
-                        searchPattern: _activeSearchPattern,
-                        activeSearchOccurrence: isThisMsgActive
-                            ? activeOcc?.occurrenceIndexInMessage
-                            : null,
-                        message: msg,
-                        onDelete: () => widget.state.deleteMessage(msg.id),
-                        onBranch: () => widget.state.branchFrom(msg.id),
-                        onEdit: (newContent) =>
-                            widget.state.editMessage(msg.id, newContent),
-                        onRegenerate: () => widget.state.regenerateFrom(msg.id),
-                        onApplyItf: (content) async {
-                          final summary = await widget.state.applyItf(
-                            content: content,
-                          );
-                          if (summary != null && context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(summary),
-                                duration: const Duration(seconds: 3),
-                              ),
+                            return MessageBubble(
+                              key: key,
+                              searchPattern: _activeSearchPattern,
+                              activeSearchOccurrence: isThisMsgActive
+                                  ? activeOcc?.occurrenceIndexInMessage
+                                  : null,
+                              message: msg,
+                              onDelete: () =>
+                                  widget.state.deleteMessage(msg.id),
+                              onBranch: () => widget.state.branchFrom(msg.id),
+                              onEdit: (newContent) =>
+                                  widget.state.editMessage(msg.id, newContent),
+                              onRegenerate: () {
+                                _stickToBottom = true;
+                                setState(() => _showScrollToBottom = false);
+                                widget.state.regenerateFrom(msg.id);
+                              },
+                              onApplyItf: (content) async {
+                                final summary = await widget.state.applyItf(
+                                  content: content,
+                                );
+                                if (summary != null && context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(summary),
+                                      duration: const Duration(seconds: 3),
+                                    ),
+                                  );
+                                }
+                              },
+                              onUndoItf: () async {
+                                final summary = await widget.state.undoItf();
+                                if (summary != null && context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(summary),
+                                      duration: const Duration(seconds: 3),
+                                    ),
+                                  );
+                                }
+                              },
                             );
-                          }
-                        },
-                        onUndoItf: () async {
-                          final summary = await widget.state.undoItf();
-                          if (summary != null && context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(summary),
-                                duration: const Duration(seconds: 3),
+                          },
+                        ),
+                      ),
+                      if (_showScrollToBottom)
+                        Positioned(
+                          right: 18,
+                          bottom: 12,
+                          child: HoverAnimatedButton(
+                            tooltip: 'Scroll to bottom',
+                            onTap: () {
+                              _stickToBottom = true;
+                              setState(() => _showScrollToBottom = false);
+                              _scrollToBottom();
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? AppTheme.surface
+                                    : AppTheme.lightSurface,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Theme.of(context).dividerColor,
+                                ),
                               ),
-                            );
-                          }
-                        },
-                      );
-                    },
+                              child: const Icon(
+                                Icons.arrow_downward,
+                                size: 16,
+                                color: AppTheme.primary,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
           ),
           if (_stagedAttachments.isNotEmpty)

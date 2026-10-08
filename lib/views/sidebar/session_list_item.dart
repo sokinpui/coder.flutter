@@ -39,16 +39,17 @@ class SessionListItem extends StatelessWidget {
         ),
       ),
       trailing: IconButton(
-        icon: const Icon(Icons.more_horiz, size: 16, color: AppTheme.textMuted),
+        icon: const Icon(Icons.edit_outlined, size: 15, color: AppTheme.textMuted),
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(),
-        onPressed: () => _showSessionOptions(context),
+        tooltip: 'Rename',
+        onPressed: () => _showRenameDialog(context),
       ),
       onTap: onTap,
     );
   }
 
-  void _showSessionOptions(BuildContext context) {
+  void _showRenameDialog(BuildContext context) {
     final controller = TextEditingController(text: session.title);
     showDialog(
       context: context,

@@ -8,10 +8,12 @@ class ReasoningCard extends StatefulWidget {
     super.key,
     required this.reasoning,
     required this.isDark,
+    this.isGenerating = false,
   });
 
   final String reasoning;
   final bool isDark;
+  final bool isGenerating;
 
   @override
   State<ReasoningCard> createState() => _ReasoningCardState();
@@ -19,6 +21,20 @@ class ReasoningCard extends StatefulWidget {
 
 class _ReasoningCardState extends State<ReasoningCard> {
   bool _isExpanded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _isExpanded = widget.isGenerating;
+  }
+
+  @override
+  void didUpdateWidget(ReasoningCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.isGenerating && widget.isGenerating) {
+      _isExpanded = true;
+    }
+  }
 
   @override
   void dispose() {
@@ -67,6 +83,17 @@ class _ReasoningCardState extends State<ReasoningCard> {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                  if (widget.isGenerating) ...[
+                    const SizedBox(width: 6),
+                    const SizedBox(
+                      width: 9,
+                      height: 9,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 1.5,
+                        color: AppTheme.accentYellow,
+                      ),
+                    ),
+                  ],
                   const SizedBox(width: 6),
                   AnimatedRotation(
                     turns: _isExpanded ? 0.5 : 0.0,

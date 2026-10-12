@@ -47,30 +47,37 @@ class MainFlutterWindow: NSWindow {
         }
         result(nil)
 
-      case "pickImage":
+      case "pickImage", "pickImages":
         NSApp.activate(ignoringOtherApps: true)
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
-        panel.allowsMultipleSelection = false
+        panel.allowsMultipleSelection = true
         panel.allowedFileTypes = ["png", "jpg", "jpeg", "gif", "webp", "bmp"]
-        if panel.runModal() == .OK, let url = panel.url, let data = try? Data(contentsOf: url) {
-          result(FlutterStandardTypedData(bytes: data))
+        if panel.runModal() == .OK {
+          var images: [FlutterStandardTypedData] = []
+          for url in panel.urls {
+            if let data = try? Data(contentsOf: url) {
+              images.append(FlutterStandardTypedData(bytes: data))
+            }
+          }
+          result(images)
           return
         }
-        result(nil)
+        result([])
 
-      case "pickFile":
+      case "pickFile", "pickFiles":
         NSApp.activate(ignoringOtherApps: true)
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
         panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        if panel.runModal() == .OK, let url = panel.url {
-          result(url.path)
+        panel.allowsMultipleSelection = true
+        if panel.runModal() == .OK {
+          let paths = panel.urls.map { $0.path }
+          result(paths)
           return
         }
-        result(nil)
+        result([])
       default:
         result(FlutterMethodNotImplemented)
       }

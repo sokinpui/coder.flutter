@@ -41,15 +41,22 @@ class _ContextDialogState extends State<ContextDialog> {
     if (_isPicking) return;
     _isPicking = true;
     try {
-      final picked = await _clipboardService.pickFilePath();
-      if (picked == null || picked.isEmpty) {
+      final paths = await _clipboardService.pickFilePaths();
+      if (paths.isEmpty) {
         return;
       }
-      if (picked.toLowerCase().endsWith('.pdf')) {
-        await widget.state.addPdf(picked);
-        return;
+      final nonPdfPaths = <String>[];
+      for (final path in paths) {
+        if (path.isEmpty) continue;
+        if (path.toLowerCase().endsWith('.pdf')) {
+          await widget.state.addPdf(path);
+        } else {
+          nonPdfPaths.add(path);
+        }
       }
-      await widget.state.addContextPaths([picked]);
+      if (nonPdfPaths.isNotEmpty) {
+        await widget.state.addContextPaths(nonPdfPaths);
+      }
     } finally {
       if (mounted) {
         setState(() => _isPicking = false);

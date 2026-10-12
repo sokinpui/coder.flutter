@@ -29,43 +29,64 @@ class IoClipboardService implements ClipboardService {
   }
 
   @override
-  Future<Uint8List?> pickImage() async {
+  Future<List<Uint8List>> pickImages() async {
     if (Platform.isAndroid) {
       try {
-        final bytes = await _androidPickerChannel.invokeMethod<Uint8List>(
-          'pickImage',
+        final list = await _androidPickerChannel.invokeListMethod<dynamic>(
+          'pickImages',
         );
-        return bytes;
+        return list?.whereType<Uint8List>().toList() ?? [];
       } catch (_) {
-        return null;
+        return [];
       }
     }
     if (Platform.isMacOS) {
       try {
-        return await _macClipboardChannel.invokeMethod<Uint8List>('pickImage');
+        final list = await _macClipboardChannel.invokeListMethod<dynamic>(
+          'pickImages',
+        );
+        return list?.whereType<Uint8List>().toList() ?? [];
       } catch (_) {
-        return null;
+        return [];
       }
     }
-    return null;
+    return [];
+  }
+
+  @override
+  Future<List<String>> pickFilePaths() async {
+    if (Platform.isAndroid) {
+      try {
+        final list = await _androidPickerChannel.invokeListMethod<dynamic>(
+          'pickFiles',
+        );
+        return list?.whereType<String>().toList() ?? [];
+      } catch (_) {
+        return [];
+      }
+    }
+    if (Platform.isMacOS) {
+      try {
+        final list = await _macClipboardChannel.invokeListMethod<dynamic>(
+          'pickFiles',
+        );
+        return list?.whereType<String>().toList() ?? [];
+      } catch (_) {
+        return [];
+      }
+    }
+    return [];
+  }
+
+  @override
+  Future<Uint8List?> pickImage() async {
+    final images = await pickImages();
+    return images.isEmpty ? null : images.first;
   }
 
   @override
   Future<String?> pickFilePath() async {
-    if (Platform.isAndroid) {
-      try {
-        return await _androidPickerChannel.invokeMethod<String>('pickFile');
-      } catch (_) {
-        return null;
-      }
-    }
-    if (Platform.isMacOS) {
-      try {
-        return await _macClipboardChannel.invokeMethod<String>('pickFile');
-      } catch (_) {
-        return null;
-      }
-    }
-    return null;
+    final paths = await pickFilePaths();
+    return paths.isEmpty ? null : paths.first;
   }
 }

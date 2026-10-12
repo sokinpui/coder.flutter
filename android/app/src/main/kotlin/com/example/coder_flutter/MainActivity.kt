@@ -16,17 +16,19 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, PICKER_CHANNEL).setMethodCallHandler { call, result ->
-            if (call.method == "pickImage") {
+            if (call.method == "pickImage" || call.method == "pickImages") {
                 pendingResult = result
                 val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
                     type = "image/*"
+                    putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
                     addCategory(Intent.CATEGORY_OPENABLE)
                 }
                 startActivityForResult(intent, PICK_IMAGE_REQUEST)
-            } else if (call.method == "pickFile") {
+            } else if (call.method == "pickFile" || call.method == "pickFiles") {
                 pendingResult = result
                 val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
                     type = "*/*"
+                    putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
                     addCategory(Intent.CATEGORY_OPENABLE)
                 }
                 startActivityForResult(intent, PICK_FILE_REQUEST)
@@ -55,38 +57,62 @@ class MainActivity : FlutterActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == PICK_IMAGE_REQUEST) {
-            if (resultCode == Activity.RESULT_OK && data?.data != null) {
+            if (resultCode == Activity.RESULT_OK && data != null) {
                 try {
-                    contentResolver.openInputStream(data.data!!)?.use { inputStream ->
-                        val bytes = inputStream.readBytes()
-                        pendingResult?.success(bytes)
-                    } ?: pendingResult?.success(null)
+                    val images = mutableListOf<ByteArray>()
+                    val clipData = data.clipData
+                    if (clipData != null) {
+                        for (i in 0 until clipData.itemCount) {
+                            val uri = clipData.getItemAt(i).uri
+                            contentResolver.openInputStream(uri)?.use { inputStream ->
+                                images.add(inputStream.readBytes())
+                            }
+                        }
+                    } else if (data.data != null) {
+                        contentResolver.openInputStream(data.data!!)?.use { inputStream ->
+                            images.add(inputStream.readBytes())
+                        }
+                    }
+                    pendingResult?.success(images)
                 } catch (e: Exception) {
                     pendingResult?.error("READ_ERROR", e.message, null)
                 }
             } else {
-                pendingResult?.success(null)
+                pendingResult?.success(emptyList<ByteArray>())
             }
             pendingResult = null
         } else if (requestCode == PICK_FILE_REQUEST) {
-            if (resultCode == Activity.RESULT_OK && data?.data != null) {
+            if (resultCode == Activity.RESULT_OK && data != null) {
                 try {
-                    val uri = data.data!!
-                    val cursor = contentResolver.query(uri, null, null, null, null)
-                    val nameIdx = cursor?.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                    cursor?.moveToFirst()
-                    val name = if (nameIdx != null && nameIdx >= 0) cursor.getString(nameIdx) else "document.pdf"
-                    cursor?.close()
-                    val file = java.io.File(cacheDir, name)
-                    contentResolver.openInputStream(uri)?.use { input ->
-                        file.outputStream().use { output -> input.copyTo(output) }
+                    val paths = mutableListOf<String>()
+                    val uris = mutableListOf<android.net.Uri>()
+                    val clipData = data.clipData
+                    if (clipData != null) {
+                        for (i in 0 until clipData.itemCount) {
+                            uris.add(clipData.getItemAt(i).uri)
+                        }
+                    } else if (data.data != null) {
+                        uris.add(data.data!!)
                     }
-                    pendingResult?.success(file.absolutePath)
+
+                    for (uri in uris) {
+                        val cursor = contentResolver.query(uri, null, null, null, null)
+                        val nameIdx = cursor?.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                        cursor?.moveToFirst()
+                        val name = if (nameIdx != null && nameIdx >= 0) cursor.getString(nameIdx) else "document.pdf"
+                        cursor?.close()
+                        val file = java.io.File(cacheDir, name)
+                        contentResolver.openInputStream(uri)?.use { input ->
+                            file.outputStream().use { output -> input.copyTo(output) }
+                        }
+                        paths.add(file.absolutePath)
+                    }
+                    pendingResult?.success(paths)
                 } catch (e: Exception) {
                     pendingResult?.error("READ_ERROR", e.message, null)
                 }
             } else {
-                pendingResult?.success(null)
+                pendingResult?.success(emptyList<String>())
             }
             pendingResult = null
         }

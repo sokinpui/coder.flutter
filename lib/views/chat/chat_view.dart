@@ -400,19 +400,24 @@ class _ChatViewState extends State<ChatView> {
     if (_isPicking) return;
     _isPicking = true;
     try {
-      final picked = await _clipboardService.pickImage();
-      if (picked != null && mounted) {
-        setState(() {
+      final pickedImages = await _clipboardService.pickImages();
+      if (pickedImages.isEmpty || !mounted) {
+        return;
+      }
+      setState(() {
+        for (var i = 0; i < pickedImages.length; i++) {
           final attachment = StagedAttachment(
             id: UniqueKey().toString(),
             type: AttachmentType.image,
-            name: 'image.png',
-            bytes: picked,
+            name: pickedImages.length > 1
+                ? 'image_${i + 1}.png'
+                : 'image.png',
+            bytes: pickedImages[i],
           );
           _stagedAttachments.add(attachment);
           _stagedDraft.add(attachment);
-        });
-      }
+        }
+      });
     } finally {
       _isPicking = false;
       _maintainInputFocus();
@@ -423,44 +428,56 @@ class _ChatViewState extends State<ChatView> {
     if (_isPicking) return;
     _isPicking = true;
     try {
-      final path = await _clipboardService.pickFilePath();
-      if (path == null || path.isEmpty || !mounted) {
+      final paths = await _clipboardService.pickFilePaths();
+      if (paths.isEmpty || !mounted) {
         return;
       }
-      final filename = path.split(RegExp(r'[/\\]')).last;
-      if (path.toLowerCase().endsWith('.pdf')) {
-        final item = StagedAttachment(
-          id: UniqueKey().toString(),
-          type: AttachmentType.pdf,
-          name: filename,
-          path: path,
-          isUploading: true,
-        );
-        setState(() => _stagedAttachments.add(item));
-        _stagedDraft.add(item);
-        try {
-          await widget.state.addPdf(path);
-          if (mounted) {
-            setState(() => item.isUploading = false);
+
+      final nonPdfPaths = <String>[];
+      for (final path in paths) {
+        if (path.isEmpty) continue;
+        final filename = path.split(RegExp(r'[/\\]')).last;
+        if (path.toLowerCase().endsWith('.pdf')) {
+          final item = StagedAttachment(
+            id: UniqueKey().toString(),
+            type: AttachmentType.pdf,
+            name: filename,
+            path: path,
+            isUploading: true,
+          );
+          setState(() => _stagedAttachments.add(item));
+          _stagedDraft.add(item);
+          try {
+            await widget.state.addPdf(path);
+            if (mounted) {
+              setState(() => item.isUploading = false);
+            }
+          } catch (_) {
+            if (mounted) {
+              setState(() {
+                item.isUploading = false;
+                item.error = 'Failed to upload PDF';
+              });
+            }
           }
-        } catch (e) {
-          if (mounted) {
-            setState(() {
-              item.isUploading = false;
-              item.error = 'Failed to upload PDF';
-            });
-          }
+        } else {
+          nonPdfPaths.add(path);
         }
-        return;
       }
-      await widget.state.addContextPaths([path]);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Added $path to context'),
-            duration: const Duration(seconds: 2),
-          ),
-        );
+
+      if (nonPdfPaths.isNotEmpty) {
+        await widget.state.addContextPaths(nonPdfPaths);
+        if (mounted) {
+          final label = nonPdfPaths.length == 1
+              ? nonPdfPaths.first
+              : '${nonPdfPaths.length} files';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Added $label to context'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
       }
     } finally {
       _isPicking = false;
@@ -825,6 +842,30 @@ class _ChatViewState extends State<ChatView> {
                 );
               },
               onRemoveAttachment: _removeStagedAttachment,
+              onRetryUpload: (index) async {
+                final attachment = _stagedAttachments[index];
+                if (attachment.type != AttachmentType.pdf ||
+                    attachment.path == null) {
+                  return;
+                }
+                setState(() {
+                  attachment.isUploading = true;
+                  attachment.error = null;
+                });
+                try {
+                  await widget.state.addPdf(attachment.path!);
+                  if (mounted) {
+                    setState(() => attachment.isUploading = false);
+                  }
+                } catch (_) {
+                  if (mounted) {
+                    setState(() {
+                      attachment.isUploading = false;
+                      attachment.error = 'Failed to upload PDF';
+                    });
+                  }
+                }
+              },
             ),
           ChatInputBar(
             promptController: _promptController,

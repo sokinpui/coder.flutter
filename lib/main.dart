@@ -8,6 +8,14 @@ import 'views/responsive_home.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppTheme.initializeFonts();
+  final originalOnError = FlutterError.onError;
+  FlutterError.onError = (details) {
+    if (details.exception is AssertionError &&
+        details.exception.toString().contains('!_pressedKeys.containsKey')) {
+      return;
+    }
+    originalOnError?.call(details);
+  };
   runApp(const MyApp());
 }
 
@@ -47,16 +55,16 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: _coderState,
-      builder: (context, _) {
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: _coderState.themeModeNotifier,
+      builder: (context, themeMode, _) {
         return MaterialApp(
           title: 'coder',
           debugShowCheckedModeBanner: false,
           scrollBehavior: const AppScrollBehavior(),
           theme: AppTheme.lightTheme(),
           darkTheme: AppTheme.darkTheme(),
-          themeMode: _coderState.themeMode,
+          themeMode: themeMode,
           home: ResponsiveHome(state: _coderState),
         );
       },

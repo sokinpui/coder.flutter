@@ -79,11 +79,40 @@ class CodeHighlighter {
     return _applySearchHighlight(baseSpan, searchPattern, isDark);
   }
 
+  static TextSpan highlightPlain(
+    String rawCode, {
+    required bool isDark,
+    RegExp? searchPattern,
+    double fontSize = 14.0,
+  }) {
+    final code = expandTabs(rawCode);
+    final fallbackColor = isDark
+        ? const Color(0xFFE6EDF3)
+        : const Color(0xFF24292F);
+    final baseSpan = TextSpan(
+      text: code,
+      style: AppTheme.monoTextStyle(
+        fontSize: fontSize,
+        height: 1.5,
+        color: fallbackColor,
+      ),
+    );
+    if (searchPattern == null) {
+      return baseSpan;
+    }
+    return _applySearchHighlight(baseSpan, searchPattern, isDark);
+  }
+
+  static bool isDiffLanguage(String lang) {
+    return _isDiffLanguage(lang.trim().toLowerCase());
+  }
+
   static bool _isDiffLanguage(String lang) {
-    return lang == 'diff' ||
-        lang == 'patch' ||
-        lang == 'rename' ||
-        lang == 'delete';
+    final clean = lang.trim().toLowerCase();
+    return clean == 'diff' ||
+        clean == 'patch' ||
+        clean == 'rename' ||
+        clean == 'delete';
   }
 
   static bool _isPlainLanguage(String lang) {

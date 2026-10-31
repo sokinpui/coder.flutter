@@ -23,18 +23,23 @@ class _ResponsiveHomeState extends State<ResponsiveHome> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        LayoutBuilder(
-          builder: (context, constraints) {
-            if (constraints.maxWidth < Responsive.compactBreakpoint) {
-              return _buildCompactLayout(context);
-            }
-            return _buildExpandedLayout(context);
-          },
-        ),
-        DisconnectedFloatingWindow(state: widget.state),
-      ],
+    return ListenableBuilder(
+      listenable: widget.state,
+      builder: (context, _) {
+        return Stack(
+          children: [
+            LayoutBuilder(
+              builder: (context, constraints) {
+                if (constraints.maxWidth < Responsive.compactBreakpoint) {
+                  return _buildCompactLayout(context);
+                }
+                return _buildExpandedLayout(context);
+              },
+            ),
+            DisconnectedFloatingWindow(state: widget.state),
+          ],
+        );
+      },
     );
   }
 

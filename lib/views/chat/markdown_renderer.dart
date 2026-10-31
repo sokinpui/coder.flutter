@@ -117,6 +117,7 @@ class _MarkdownRendererState extends State<MarkdownRenderer> {
                     language: language,
                     code: code,
                     searchPattern: widget.searchPattern,
+                    isGenerating: widget.isGenerating,
                   ),
                 ),
                 TableConfig(

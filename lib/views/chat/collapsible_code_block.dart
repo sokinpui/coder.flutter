@@ -12,11 +12,13 @@ class CollapsibleCodeBlock extends StatefulWidget {
     required this.language,
     required this.code,
     this.searchPattern,
+    this.isGenerating = false,
   });
 
   final String language;
   final String code;
   final RegExp? searchPattern;
+  final bool isGenerating;
 
   @override
   State<CollapsibleCodeBlock> createState() => _CollapsibleCodeBlockState();
@@ -24,6 +26,12 @@ class CollapsibleCodeBlock extends StatefulWidget {
 
 class _CollapsibleCodeBlockState extends State<CollapsibleCodeBlock> {
   bool _isCollapsed = false;
+  TextSpan? _cachedSpan;
+  String? _lastCode;
+  String? _lastLanguage;
+  bool? _lastIsDark;
+  RegExp? _lastSearchPattern;
+  bool? _lastIsGenerating;
 
   @override
   void initState() {
@@ -48,6 +56,40 @@ class _CollapsibleCodeBlockState extends State<CollapsibleCodeBlock> {
     if (pattern != null && _isCollapsed && pattern.hasMatch(widget.code)) {
       _isCollapsed = false;
     }
+  }
+
+  TextSpan _getOrCreateSpan(bool isDark) {
+    if (_cachedSpan != null &&
+        _lastCode == widget.code &&
+        _lastLanguage == widget.language &&
+        _lastIsDark == isDark &&
+        _lastSearchPattern == widget.searchPattern &&
+        _lastIsGenerating == widget.isGenerating) {
+      return _cachedSpan!;
+    }
+
+    _lastCode = widget.code;
+    _lastLanguage = widget.language;
+    _lastIsDark = isDark;
+    _lastSearchPattern = widget.searchPattern;
+    _lastIsGenerating = widget.isGenerating;
+
+    if (widget.isGenerating && !CodeHighlighter.isDiffLanguage(widget.language)) {
+      _cachedSpan = CodeHighlighter.highlightPlain(
+        widget.code,
+        isDark: isDark,
+        searchPattern: widget.searchPattern,
+      );
+      return _cachedSpan!;
+    }
+
+    _cachedSpan = CodeHighlighter.highlight(
+      widget.code,
+      widget.language,
+      isDark: isDark,
+      searchPattern: widget.searchPattern,
+    );
+    return _cachedSpan!;
   }
 
   int get _lineCount {
@@ -175,12 +217,7 @@ class _CollapsibleCodeBlockState extends State<CollapsibleCodeBlock> {
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.all(12),
               child: SelectableText.rich(
-                CodeHighlighter.highlight(
-                  widget.code,
-                  widget.language,
-                  isDark: isDark,
-                  searchPattern: widget.searchPattern,
-                ),
+                _getOrCreateSpan(isDark),
                 onSelectionChanged: (selection, cause) {
                   if (selection.isCollapsed) {
                     ChatSelectionTracker.clearSelection(this);

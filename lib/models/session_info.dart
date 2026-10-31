@@ -14,11 +14,12 @@ class SessionInfo {
       return null;
     }
 
+    final fn = json['filename'] as String? ?? json['id'] as String? ?? '';
     return SessionInfo(
-      filename: json['filename'] as String? ?? '',
-      title: json['title'] as String? ?? 'Untitled Chat',
-      createdAt: parseDate(json['createdAt']),
-      modifiedAt: parseDate(json['modifiedAt']),
+      filename: fn,
+      title: json['title'] as String? ?? (fn.isNotEmpty ? fn : 'Untitled Chat'),
+      createdAt: parseDate(json['createdAt'] ?? json['created_at']),
+      modifiedAt: parseDate(json['modifiedAt'] ?? json['modified_at']),
     );
   }
 

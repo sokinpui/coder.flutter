@@ -104,6 +104,9 @@ class _HistoryPageState extends State<HistoryPage> {
   Future<void> _handleRename(SessionInfo session, String newTitle) async {
     final trimmed = newTitle.trim();
     if (trimmed.isEmpty || trimmed == session.title) return;
+    if (widget.state.currentSessionFilename != session.filename) {
+      await widget.state.loadSession(session.filename);
+    }
     await widget.state.renameSession(trimmed);
     await _refreshHistory();
   }
@@ -136,14 +139,17 @@ class _HistoryPageState extends State<HistoryPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final textColor = isDark ? AppTheme.textMain : AppTheme.lightTextMain;
-    final allSessions = widget.state.historySessions;
-    final filteredSessions = _filterSessions(allSessions);
+    return ListenableBuilder(
+      listenable: widget.state,
+      builder: (context, _) {
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
+        final textColor = isDark ? AppTheme.textMain : AppTheme.lightTextMain;
+        final allSessions = widget.state.historySessions;
+        final filteredSessions = _filterSessions(allSessions);
 
-    return Scaffold(
-      appBar: AppBar(
+        return Scaffold(
+          appBar: AppBar(
         title: const Text('Chat History'),
         actions: [
           IconButton(
@@ -239,6 +245,8 @@ class _HistoryPageState extends State<HistoryPage> {
           ),
         ),
       ),
+    );
+      },
     );
   }
 

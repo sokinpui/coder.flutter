@@ -26,8 +26,10 @@ class CoderState extends ChangeNotifier {
   String _serverHost = '127.0.0.1';
   int _serverPort = 9005;
   bool _useTls = false;
-  ThemeMode _themeMode = ThemeMode.light;
+  final ValueNotifier<ThemeMode> themeModeNotifier =
+      ValueNotifier<ThemeMode>(ThemeMode.light);
   bool _isSidebarVisible = true;
+  String _mode = 'coder';
   String _activeModel = 'default';
   String _sessionTitle = 'New Chat';
   String? _currentSessionFilename;
@@ -56,7 +58,8 @@ class CoderState extends ChangeNotifier {
   String get serverHost => _serverHost;
   int get serverPort => _serverPort;
   bool get useTls => _useTls;
-  ThemeMode get themeMode => _themeMode;
+  ThemeMode get themeMode => themeModeNotifier.value;
+  String get mode => _mode;
   bool get isSearchVisible => _isSearchVisible;
   bool get isSidebarVisible => _isSidebarVisible;
   String get activeModel => _activeModel;
@@ -102,7 +105,8 @@ class CoderState extends ChangeNotifier {
     }
     final modeStr = settings['themeMode'] as String?;
     if (modeStr != null) {
-      _themeMode = modeStr == 'dark' ? ThemeMode.dark : ThemeMode.light;
+      themeModeNotifier.value =
+          modeStr == 'dark' ? ThemeMode.dark : ThemeMode.light;
     }
     final isSidebar = settings['isSidebarVisible'] as bool?;
     if (isSidebar != null) {
@@ -121,14 +125,14 @@ class CoderState extends ChangeNotifier {
       'serverHost': _serverHost,
       'serverPort': _serverPort,
       'useTls': _useTls,
-      'themeMode': _themeMode == ThemeMode.light ? 'light' : 'dark',
+      'themeMode': themeMode == ThemeMode.light ? 'light' : 'dark',
       'isSidebarVisible': _isSidebarVisible,
       'activeModel': _activeModel,
     });
   }
 
   void toggleTheme() {
-    _themeMode = _themeMode == ThemeMode.dark
+    themeModeNotifier.value = themeModeNotifier.value == ThemeMode.dark
         ? ThemeMode.light
         : ThemeMode.dark;
     notifyListeners();
@@ -247,11 +251,14 @@ class CoderState extends ChangeNotifier {
 
   Future<void> _initializeRemoteSession() async {
     try {
-      final params = <String, dynamic>{'mode': 'chat'};
+      final params = <String, dynamic>{'mode': _mode};
       if (_activeModel != 'default') {
         params['model'] = _activeModel;
       }
       final res = await _client.request('session/init', params);
+      if (res is Map && res.containsKey('mode') && res['mode'] != null) {
+        _mode = res['mode'] as String;
+      }
       if (res is Map) {
         if (res.containsKey('model')) {
           _activeModel = res['model'] as String;
@@ -411,6 +418,11 @@ class CoderState extends ChangeNotifier {
       final res = await _client.request('session/message/delete', {
         'index': index,
       });
+      if (res is Map && res.containsKey('messages')) {
+        final parsed = _parseMessagesFromRaw(res['messages'] as List?);
+        _messages.clear();
+        _messages.addAll(parsed);
+      }
       if (res is Map && res.containsKey('tokenCount')) {
         _tokenCount = (res['tokenCount'] as num?)?.toInt() ?? _tokenCount;
         notifyListeners();
@@ -512,6 +524,11 @@ class CoderState extends ChangeNotifier {
     if (_isGenerating) {
       return;
     }
+    _flushSmoothStream();
+    _isStreamDonePending = false;
+    _streamTokenCount = 0;
+    _pendingContent = '';
+    _pendingReasoning = '';
     _isSearchVisible = false;
     final index = _messages.indexWhere((m) => m.id == messageId);
     if (index == -1) {
@@ -521,6 +538,7 @@ class CoderState extends ChangeNotifier {
     try {
       final res = await _client.request('session/branch', {'index': index});
       if (res is Map) {
+        final parsed = _parseMessagesFromRaw(res['messages'] as List?);
         _sessionTitle = res['title'] as String? ?? 'Branched Chat';
         if (res.containsKey('tokenCount')) {
           _tokenCount = (res['tokenCount'] as num?)?.toInt() ?? 0;
@@ -540,7 +558,7 @@ class CoderState extends ChangeNotifier {
               [];
         }
         _messages.clear();
-        _messages.addAll(_parseMessagesFromRaw(res['messages'] as List?));
+        _messages.addAll(parsed);
         notifyListeners();
         await fetchHistory();
       }
@@ -555,8 +573,8 @@ class CoderState extends ChangeNotifier {
     final result = <ChatMessage>[];
     for (final m in rawMsgs) {
       if (m is! Map) continue;
-      final typeInt = m['Type'] as int? ?? 0;
-      final content = m['Content'] as String? ?? '';
+      final typeInt = m['Type'] as int? ?? m['type'] as int? ?? 0;
+      final content = m['Content'] as String? ?? m['content'] as String? ?? '';
       if (typeInt == 8 || typeInt == 9 || typeInt == 5 || typeInt == 6) {
         continue;
       }
@@ -566,15 +584,50 @@ class CoderState extends ChangeNotifier {
       final isToolCall = typeInt == 20;
       final isToolResult = typeInt == 21;
 
+      if (isToolCall) {
+        final toolCalls = (m['ToolCalls'] ?? m['tool_calls']) as List?;
+        if (toolCalls != null && toolCalls.isNotEmpty) {
+          for (final tc in toolCalls) {
+            if (tc is Map) {
+              final id = tc['id'] as String? ?? tc['ID'] as String?;
+              final name = tc['name'] as String? ?? tc['Name'] as String?;
+              final args = tc['arguments'] as String? ?? tc['Arguments'] as String? ?? '';
+              result.add(
+                ChatMessage(
+                  id: UniqueKey().toString(),
+                  author: MessageAuthor.toolCall,
+                  content: args,
+                  toolName: name,
+                  callId: id,
+                ),
+              );
+            }
+          }
+          continue;
+        }
+      }
+
       Uint8List? imgData;
-      if (isImage && m['Data'] is String && (m['Data'] as String).isNotEmpty) {
+      final rawData = m['Data'] ?? m['data'];
+      if (isImage && rawData is String && rawData.isNotEmpty) {
         try {
-          imgData = base64Decode(m['Data'] as String);
+          imgData = base64Decode(rawData);
         } catch (_) {}
       }
 
-      final callId = m['call_id'] as String? ?? m['CallID'] as String?;
-      final toolName = m['tool_name'] as String? ?? m['ToolName'] as String?;
+      final callId = m['call_id'] as String? ?? m['CallID'] as String? ?? m['tool_call_id'] as String? ?? m['ToolCallID'] as String?;
+      var toolName = m['tool_name'] as String? ?? m['ToolName'] as String?;
+
+      if (isToolResult && (toolName == null || toolName.isEmpty)) {
+        if (callId != null && callId.isNotEmpty) {
+          for (var i = result.length - 1; i >= 0; i--) {
+            if (result[i].callId == callId && result[i].toolName != null) {
+              toolName = result[i].toolName;
+              break;
+            }
+          }
+        }
+      }
 
       MessageAuthor author;
       if (isImage) {
@@ -595,7 +648,8 @@ class CoderState extends ChangeNotifier {
           typeInt == 11 ||
           typeInt == 13 ||
           typeInt == 15 ||
-          typeInt == 18) {
+          typeInt == 18 ||
+          typeInt == 22) {
         author = MessageAuthor.commandResult;
       } else if (typeInt == 4 || typeInt == 16 || typeInt == 19) {
         author = MessageAuthor.commandError;
@@ -783,8 +837,8 @@ class CoderState extends ChangeNotifier {
       final res = await _client.request('history/list');
       if (res is List) {
         _historySessions = res
-            .whereType<Map<String, dynamic>>()
-            .map(SessionInfo.fromJson)
+            .whereType<Map>()
+            .map((e) => SessionInfo.fromJson(Map<String, dynamic>.from(e)))
             .toList();
         notifyListeners();
       }
@@ -792,10 +846,17 @@ class CoderState extends ChangeNotifier {
   }
 
   Future<void> loadSession(String filename) async {
+    _flushSmoothStream();
+    _isGenerating = false;
+    _isStreamDonePending = false;
+    _streamTokenCount = 0;
+    _pendingContent = '';
+    _pendingReasoning = '';
     _isSearchVisible = false;
     try {
       final res = await _client.request('history/load', {'filename': filename});
       if (res is Map) {
+        final parsed = _parseMessagesFromRaw(res['messages'] as List?);
         _currentSessionFilename = filename;
         _sessionTitle = res['title'] as String? ?? 'Loaded Chat';
         if (res.containsKey('tokenCount')) {
@@ -816,7 +877,7 @@ class CoderState extends ChangeNotifier {
               [];
         }
         _messages.clear();
-        _messages.addAll(_parseMessagesFromRaw(res['messages'] as List?));
+        _messages.addAll(parsed);
         notifyListeners();
       }
     } catch (e) {
@@ -930,7 +991,6 @@ class CoderState extends ChangeNotifier {
 
       _ensureSmoothStreamTimer();
       return;
-      return;
     }
 
     if (method == 'session/event' && params is Map) {
@@ -957,7 +1017,7 @@ class CoderState extends ChangeNotifier {
       return;
     }
     _smoothStreamTimer = Timer.periodic(
-      const Duration(milliseconds: 20),
+      const Duration(milliseconds: 50),
       _onSmoothStreamTick,
     );
     _onSmoothStreamTick(_smoothStreamTimer!);
@@ -976,10 +1036,10 @@ class CoderState extends ChangeNotifier {
             isGenerating: true,
           ),
         );
+        notifyListeners();
       }
     }
 
-    var didUpdate = false;
     if (_messages.isNotEmpty &&
         _messages.last.author == MessageAuthor.assistant) {
       final last = _messages.last;
@@ -989,15 +1049,13 @@ class CoderState extends ChangeNotifier {
         final safeLen = _safeSubstringLength(_pendingReasoning, step);
         final chunk = _pendingReasoning.substring(0, safeLen);
         _pendingReasoning = _pendingReasoning.substring(safeLen);
-        last.reasoning += chunk;
-        didUpdate = true;
+        last.appendReasoning(chunk);
       } else if (_pendingContent.isNotEmpty) {
         final step = _calculateStep(_pendingContent.length);
         final safeLen = _safeSubstringLength(_pendingContent, step);
         final chunk = _pendingContent.substring(0, safeLen);
         _pendingContent = _pendingContent.substring(safeLen);
-        last.content += chunk;
-        didUpdate = true;
+        last.appendContent(chunk);
       }
     }
 
@@ -1031,13 +1089,6 @@ class CoderState extends ChangeNotifier {
     if (!hasPending && !_isStreamDonePending) {
       _smoothStreamTimer?.cancel();
       _smoothStreamTimer = null;
-      if (didUpdate) {
-        notifyListeners();
-      }
-      return;
-    }
-
-    if (didUpdate) {
       notifyListeners();
     }
   }
@@ -1070,6 +1121,7 @@ class CoderState extends ChangeNotifier {
   @override
   void dispose() {
     _flushSmoothStream();
+    themeModeNotifier.dispose();
     _reconnectTimer?.cancel();
     _client.disconnect();
     super.dispose();

@@ -19,15 +19,20 @@ class SessionListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isSelected = state.currentSessionFilename == session.filename;
 
     return ListTile(
       dense: true,
+      selected: isSelected,
+      selectedTileColor: isDark
+          ? AppTheme.surfaceSubtle
+          : AppTheme.lightSurfaceSubtle,
       contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-      leading: const Icon(
-        Icons.chat_bubble_outline,
+      leading: Icon(
+        isSelected ? Icons.chat_bubble : Icons.chat_bubble_outline,
         size: 16,
-        color: AppTheme.textMuted,
+        color: isSelected ? AppTheme.primary : AppTheme.textMuted,
       ),
       title: Text(
         session.title,
@@ -35,7 +40,10 @@ class SessionListItem extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
           fontSize: 13,
-          color: isDark ? AppTheme.textMain : AppTheme.lightTextMain,
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+          color: isSelected
+              ? AppTheme.primary
+              : (isDark ? AppTheme.textMain : AppTheme.lightTextMain),
         ),
       ),
       trailing: IconButton(
@@ -73,8 +81,14 @@ class SessionListItem extends StatelessWidget {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () {
-              state.renameSession(controller.text);
+            onPressed: () async {
+              final newTitle = controller.text.trim();
+              if (newTitle.isEmpty || newTitle == session.title) return;
+              if (state.currentSessionFilename != session.filename) {
+                await state.loadSession(session.filename);
+              }
+              await state.renameSession(newTitle);
+              if (!context.mounted) return;
               Navigator.of(ctx).pop();
             },
             child: const Text('Rename'),

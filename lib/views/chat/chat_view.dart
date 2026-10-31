@@ -7,6 +7,7 @@ import '../../core/services/clipboard_service.dart';
 import '../../core/utils/chat_selection_tracker.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/hover_animated_button.dart';
+import '../../models/chat_message.dart';
 import '../../models/staged_attachment.dart';
 import 'media_preview_dialog.dart';
 import '../settings/context_dialog.dart';
@@ -57,11 +58,12 @@ class _ChatViewState extends State<ChatView> {
   RegExp? _activeSearchPattern;
   bool _isPicking = false;
   String? _searchError;
-  bool _isAutoScrolling = false;
+  bool _isScrollPending = false;
   bool _stickToBottom = true;
   bool _showScrollToBottom = false;
   final List<StagedAttachment> _stagedAttachments = [];
   int _lastMessageCount = 0;
+  ChatMessage? _activeGeneratingMessage;
 
   bool get _isMac =>
       defaultTargetPlatform == TargetPlatform.macOS ||
@@ -102,6 +104,7 @@ class _ChatViewState extends State<ChatView> {
     _promptController.addListener(_onPromptChanged);
     _searchController.addListener(_onSearchChanged);
     _lastMessageCount = widget.state.messages.length;
+    _syncActiveGeneratingMessageListener();
   }
 
   @override
@@ -131,6 +134,7 @@ class _ChatViewState extends State<ChatView> {
     }
 
     if (oldWidget.state.isSearchVisible && !widget.state.isSearchVisible) {
+      _messageKeys.clear();
       _searchController.clear();
       setState(() {
         _activeSearchPattern = null;
@@ -139,10 +143,13 @@ class _ChatViewState extends State<ChatView> {
         _searchError = null;
       });
     }
+
+    _syncActiveGeneratingMessageListener();
   }
 
   @override
   void dispose() {
+    _activeGeneratingMessage?.removeListener(_onActiveMessageUpdated);
     _promptController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
@@ -150,6 +157,23 @@ class _ChatViewState extends State<ChatView> {
     _chatFocusNode.dispose();
     _inputFocusNode.dispose();
     super.dispose();
+  }
+
+  void _syncActiveGeneratingMessageListener() {
+    final messages = widget.state.messages;
+    final lastMsg = (messages.isNotEmpty && widget.state.isGenerating)
+        ? messages.last
+        : null;
+    if (identical(_activeGeneratingMessage, lastMsg)) return;
+
+    _activeGeneratingMessage?.removeListener(_onActiveMessageUpdated);
+    _activeGeneratingMessage = lastMsg;
+    _activeGeneratingMessage?.addListener(_onActiveMessageUpdated);
+  }
+
+  void _onActiveMessageUpdated() {
+    if (!mounted) return;
+    _autoScrollToBottomIfAppropriate();
   }
 
   void _onPromptChanged() {
@@ -180,36 +204,22 @@ class _ChatViewState extends State<ChatView> {
     if (!_stickToBottom) return;
     if (widget.state.isSearchVisible) return;
     if (!_scrollController.hasClients) return;
-    if (_scrollController.position.isScrollingNotifier.value) return;
+    if (_isScrollPending) return;
 
     final target = _scrollController.position.maxScrollExtent;
     final distance = target - _scrollController.offset;
-    if (distance <= 0.5) return;
+    if (distance <= 1.0) return;
 
+    _isScrollPending = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _isScrollPending = false;
       if (!mounted || !_scrollController.hasClients || !_stickToBottom) return;
-      if (_scrollController.position.isScrollingNotifier.value) return;
+      if (widget.state.isSearchVisible) return;
 
       final currentTarget = _scrollController.position.maxScrollExtent;
-      final currentDistance = currentTarget - _scrollController.offset;
-      if (currentDistance <= 0.5) return;
-
-      if (currentDistance <= 64.0) {
+      if ((currentTarget - _scrollController.offset).abs() > 1.0) {
         _scrollController.jumpTo(currentTarget);
-        return;
       }
-
-      if (_isAutoScrolling) return;
-      _isAutoScrolling = true;
-      _scrollController
-          .animateTo(
-            target,
-            duration: const Duration(milliseconds: 120),
-            curve: Curves.easeOutCubic,
-          )
-          .whenComplete(() {
-            _isAutoScrolling = false;
-          });
     });
   }
 
@@ -540,6 +550,7 @@ class _ChatViewState extends State<ChatView> {
 
   void _closeSearch() {
     widget.state.toggleSearch(false);
+    _messageKeys.clear();
     _searchController.clear();
     _maintainInputFocus();
   }
@@ -701,8 +712,16 @@ class _ChatViewState extends State<ChatView> {
               onSubmitted: (_) => _nextMatch(),
             ),
           Expanded(
-            child: messages.isEmpty
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, animation) {
+                return FadeTransition(opacity: animation, child: child);
+              },
+              child: messages.isEmpty
                 ? ChatEmptyState(
+                    key: const ValueKey('chat_empty_state'),
                     activeModel: widget.state.activeModel,
                     onCodeAndChat: () {
                       if (widget.state.isSearchVisible) {
@@ -724,6 +743,7 @@ class _ChatViewState extends State<ChatView> {
                     onAddFileOrPdf: _handleAddFileOrPdf,
                   )
                 : Stack(
+                    key: const ValueKey('chat_messages_stack'),
                     children: [
                       NotificationListener<ScrollNotification>(
                         onNotification: (notification) {
@@ -739,10 +759,9 @@ class _ChatViewState extends State<ChatView> {
                           itemCount: messages.length,
                           itemBuilder: (context, index) {
                             final msg = messages[index];
-                            final key = _messageKeys.putIfAbsent(
-                              msg.id,
-                              () => GlobalKey(),
-                            );
+                            final Key itemKey = widget.state.isSearchVisible
+                                ? _messageKeys.putIfAbsent(msg.id, () => GlobalKey())
+                                : ValueKey(msg.id);
                             final activeOcc = _searchOccurrences.isNotEmpty
                                 ? _searchOccurrences[_currentMatchIndex]
                                 : null;
@@ -750,7 +769,7 @@ class _ChatViewState extends State<ChatView> {
                                 activeOcc?.messageIndex == index;
 
                             return MessageBubble(
-                              key: key,
+                              key: itemKey,
                               searchPattern: _activeSearchPattern,
                               activeSearchOccurrence: isThisMsgActive
                                   ? activeOcc?.occurrenceIndexInMessage
@@ -828,6 +847,7 @@ class _ChatViewState extends State<ChatView> {
                         ),
                     ],
                   ),
+            ),
           ),
           if (_stagedAttachments.isNotEmpty)
             StagedAttachmentsPreview(

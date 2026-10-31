@@ -69,6 +69,9 @@ class _MessageBubbleState extends State<MessageBubble> {
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: widget.message,
+      builder: (context, _) {
     final theme = Theme.of(context);
     final isToolCall = widget.message.author == MessageAuthor.toolCall;
     final isToolResult = widget.message.author == MessageAuthor.toolResult;
@@ -224,6 +227,8 @@ class _MessageBubbleState extends State<MessageBubble> {
           ],
         ],
       ),
+    );
+      },
     );
   }
 

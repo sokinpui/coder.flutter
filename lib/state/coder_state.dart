@@ -29,7 +29,7 @@ class CoderState extends ChangeNotifier {
   final ValueNotifier<ThemeMode> themeModeNotifier =
       ValueNotifier<ThemeMode>(ThemeMode.light);
   bool _isSidebarVisible = true;
-  String _mode = 'coder';
+  String _mode = 'chat';
   String _activeModel = 'default';
   String _sessionTitle = 'New Chat';
   String? _currentSessionFilename;
@@ -130,8 +130,10 @@ class CoderState extends ChangeNotifier {
       _isSidebarVisible = isSidebar;
     }
     final savedMode = settings['mode'] as String?;
-    if (savedMode != null && savedMode.isNotEmpty) {
+    if (savedMode != null && savedMode.isNotEmpty && savedMode != 'coder') {
       _mode = savedMode;
+    } else {
+      _mode = 'chat';
     }
     final modelStr = settings['activeModel'] as String?;
     if (modelStr != null && modelStr.isNotEmpty) {
@@ -275,6 +277,7 @@ class CoderState extends ChangeNotifier {
     try {
       _currentSessionFilename = null;
       _previousSessionFilenames = _historySessions.map((s) => s.filename).toSet();
+      _mode = 'chat';
       final params = <String, dynamic>{'mode': _mode};
       if (_activeModel != 'default') {
         params['model'] = _activeModel;
@@ -332,6 +335,7 @@ class CoderState extends ChangeNotifier {
     _contextFiles.clear();
     _contextDocuments.clear();
     _sessionTitle = 'New Chat';
+    _mode = 'chat';
     notifyListeners();
     await _initializeRemoteSession();
     await fetchHistory();
@@ -897,7 +901,7 @@ class CoderState extends ChangeNotifier {
 
   Future<void> fetchHistory() async {
     try {
-      final res = await _client.request('history/list', {'mode': 'all'});
+      final res = await _client.request('history/list', {'mode': _mode});
       dynamic data = res;
       if (data is Map && data.containsKey('items')) {
         data = data['items'];

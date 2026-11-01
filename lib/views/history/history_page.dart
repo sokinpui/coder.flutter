@@ -57,9 +57,8 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   Future<void> _selectSession(SessionInfo session) async {
-    await widget.state.loadSession(session.filename);
-    if (!mounted) return;
     Navigator.of(context).pop();
+    await widget.state.loadSession(session.filename);
   }
 
   void _showRenameDialog(SessionInfo session) {

@@ -51,6 +51,14 @@ class _MarkdownRendererState extends State<MarkdownRenderer> {
           generator: (e, config, visitor) =>
               LatexNode(e.attributes, e.textContent, config, isDark),
         ),
+        SpanNodeGeneratorWithTag(
+          tag: MarkdownTag.pre.name,
+          generator: (e, config, visitor) => CustomCodeBlockNode(
+            e,
+            widget.searchPattern,
+            widget.isGenerating,
+          ),
+        ),
       ],
       textGenerator: (node, config, visitor) => CustomSearchTextNode(
         node.textContent,
@@ -110,14 +118,6 @@ class _MarkdownRendererState extends State<MarkdownRenderer> {
                     fontSize: 13.5,
                     fontWeight: FontWeight.w600,
                     color: baseColor,
-                  ),
-                ),
-                PreConfig(
-                  wrapper: (child, code, language) => CollapsibleCodeBlock(
-                    language: language,
-                    code: code,
-                    searchPattern: widget.searchPattern,
-                    isGenerating: widget.isGenerating,
                   ),
                 ),
                 TableConfig(
@@ -319,6 +319,63 @@ class LatexNode extends SpanNode {
         ),
       ),
     );
+  }
+}
+
+class CustomCodeBlockNode extends SpanNode {
+  CustomCodeBlockNode(
+    this.element,
+    this.searchPattern,
+    this.isGenerating,
+  );
+
+  final m.Element element;
+  final RegExp? searchPattern;
+  final bool isGenerating;
+
+  @override
+  InlineSpan build() {
+    final language = _extractLanguage(element);
+    final code = element.textContent;
+
+    return WidgetSpan(
+      child: CollapsibleCodeBlock(
+        language: language,
+        code: code,
+        searchPattern: searchPattern,
+        isGenerating: isGenerating,
+      ),
+    );
+  }
+
+  static String _extractLanguage(m.Element element) {
+    final rawClass = _resolveRawClass(element);
+    if (rawClass == null || rawClass.isEmpty) {
+      return '';
+    }
+
+    final tokens = rawClass.split(RegExp(r'\s+'));
+    for (final token in tokens) {
+      if (token.startsWith('language-')) {
+        return token.substring(9).trim();
+      }
+    }
+
+    for (final token in tokens) {
+      final cleaned = token.replaceAll('language-', '').trim();
+      if (cleaned.isNotEmpty && cleaned != 'hljs') {
+        return cleaned;
+      }
+    }
+
+    return '';
+  }
+
+  static String? _resolveRawClass(m.Element element) {
+    final direct = element.attributes['class'];
+    if (direct != null && direct.isNotEmpty) return direct;
+    final firstChild = element.children?.firstOrNull;
+    return firstChild is m.Element ? firstChild.attributes['class'] : null;
   }
 }
 

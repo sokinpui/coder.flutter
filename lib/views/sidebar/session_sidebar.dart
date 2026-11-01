@@ -257,7 +257,7 @@ class SessionSidebar extends StatelessWidget {
               size: 16,
               color: AppTheme.textMuted,
             ),
-            tooltip: 'Server Settings',
+            tooltip: 'Settings',
             onPressed: () {
               showDialog(
                 context: context,

@@ -92,14 +92,9 @@ class _MessageBubbleState extends State<MessageBubble> {
         widget.message.author == MessageAuthor.user ||
         widget.message.author == MessageAuthor.command ||
         isImageMsg;
-    final screenWidth = MediaQuery.of(context).size.width;
     final isCompact = Responsive.isCompact(context);
-
-    final maxBubbleWidth = isCompact
-        ? (screenWidth * (isUserSide ? 0.82 : 0.88)).clamp(220.0, 600.0)
-        : 800.0;
     final minBubbleWidth = _isEditing
-        ? (isCompact ? (maxBubbleWidth - 20).clamp(180.0, 320.0) : 320.0)
+        ? (isCompact ? 240.0 : 320.0)
         : 0.0;
 
     return Padding(
@@ -117,7 +112,6 @@ class _MessageBubbleState extends State<MessageBubble> {
           Flexible(
             child: Container(
               constraints: BoxConstraints(
-                maxWidth: maxBubbleWidth,
                 minWidth: minBubbleWidth,
               ),
               padding: EdgeInsets.symmetric(
@@ -144,7 +138,7 @@ class _MessageBubbleState extends State<MessageBubble> {
                     : CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (isImageMsg) _buildImagePayload(context, maxBubbleWidth),
+                  if (isImageMsg) _buildImagePayload(context),
                   if (isPdfMsg) _buildPdfPayload(context, isDark),
                   if (isToolCall)
                     ToolCallCard(
@@ -357,7 +351,7 @@ class _MessageBubbleState extends State<MessageBubble> {
     );
   }
 
-  Widget _buildImagePayload(BuildContext context, double maxWidth) {
+  Widget _buildImagePayload(BuildContext context) {
     final title =
         widget.message.imagePath?.split(RegExp(r'[/\\]')).last ?? 'Image';
     final hasBytes = widget.message.imageData != null;
@@ -382,7 +376,7 @@ class _MessageBubbleState extends State<MessageBubble> {
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: ConstrainedBox(
-                constraints: BoxConstraints(maxHeight: 400, maxWidth: maxWidth),
+                constraints: const BoxConstraints(maxHeight: 400),
                 child: hasBytes
                     ? Image.memory(
                         widget.message.imageData!,

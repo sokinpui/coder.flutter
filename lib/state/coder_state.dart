@@ -54,6 +54,7 @@ class CoderState extends ChangeNotifier {
   bool _isStreamDonePending = false;
   int _streamTokenCount = 0;
   bool _hasAttemptedConnection = false;
+  Set<String> _previousSessionFilenames = {};
 
   String get serverHost => _serverHost;
   int get serverPort => _serverPort;
@@ -76,6 +77,22 @@ class CoderState extends ChangeNotifier {
   bool get isAutoReconnecting => _isAutoReconnecting;
   int get tokenCount => _tokenCount;
   bool get hasAttemptedConnection => _hasAttemptedConnection;
+
+  bool isSessionSelected(SessionInfo session) {
+    if (_currentSessionFilename != null) {
+      return _currentSessionFilename == session.filename;
+    }
+    if (_messages.isEmpty) {
+      return false;
+    }
+    if (_sessionTitle.isNotEmpty && _sessionTitle != 'New Chat') {
+      return session.title == _sessionTitle;
+    }
+    if (_historySessions.isNotEmpty) {
+      return _historySessions.first.filename == session.filename;
+    }
+    return false;
+  }
 
   String get httpBaseUrl {
     final scheme = _useTls ? 'https' : 'http';
@@ -256,6 +273,8 @@ class CoderState extends ChangeNotifier {
 
   Future<void> _initializeRemoteSession() async {
     try {
+      _currentSessionFilename = null;
+      _previousSessionFilenames = _historySessions.map((s) => s.filename).toSet();
       final params = <String, dynamic>{'mode': _mode};
       if (_activeModel != 'default') {
         params['model'] = _activeModel;
@@ -265,6 +284,14 @@ class CoderState extends ChangeNotifier {
         _mode = res['mode'] as String;
       }
       if (res is Map) {
+        final fn = res['filename']?.toString() ??
+            res['id']?.toString() ??
+            res['sessionFilename']?.toString() ??
+            res['session_filename']?.toString() ??
+            res['sessionId']?.toString();
+        if (fn != null && fn.isNotEmpty) {
+          _currentSessionFilename = fn;
+        }
         if (res.containsKey('model')) {
           _activeModel = res['model'] as String;
         }
@@ -287,7 +314,6 @@ class CoderState extends ChangeNotifier {
         }
       }
       _sessionTitle = 'New Chat';
-      _currentSessionFilename = null;
       _messages.clear();
       notifyListeners();
     } catch (_) {}
@@ -299,6 +325,7 @@ class CoderState extends ChangeNotifier {
     _streamTokenCount = 0;
     _isSearchVisible = false;
     _currentSessionFilename = null;
+    _previousSessionFilenames = _historySessions.map((s) => s.filename).toSet();
     _isGenerating = false;
     _tokenCount = 0;
     _messages.clear();
@@ -367,7 +394,16 @@ class CoderState extends ChangeNotifier {
       if (hasImages) {
         params['images'] = images.map(base64Encode).toList();
       }
-      await _client.request('session/prompt', params);
+      final res = await _client.request('session/prompt', params);
+      if (res is Map) {
+        final fn = res['filename']?.toString() ??
+            res['id']?.toString() ??
+            res['sessionFilename']?.toString() ??
+            res['sessionId']?.toString();
+        if (fn != null && fn.isNotEmpty) {
+          _currentSessionFilename = fn;
+        }
+      }
     } catch (e) {
       aiMsg.content = 'Error sending prompt: $e';
       _lastFailedAction = () => sendPrompt(text, images: images);
@@ -560,6 +596,13 @@ class CoderState extends ChangeNotifier {
       if (res is Map) {
         final parsed = _parseMessagesFromRaw(res['messages'] as List?);
         _sessionTitle = res['title'] as String? ?? 'Branched Chat';
+        final fn = res['filename']?.toString() ??
+            res['id']?.toString() ??
+            res['sessionFilename']?.toString() ??
+            res['sessionId']?.toString();
+        if (fn != null && fn.isNotEmpty) {
+          _currentSessionFilename = fn;
+        }
         if (res.containsKey('tokenCount')) {
           _tokenCount = (res['tokenCount'] as num?)?.toInt() ?? 0;
         }
@@ -866,11 +909,45 @@ class CoderState extends ChangeNotifier {
             .whereType<Map>()
             .map((e) => SessionInfo.fromJson(Map<String, dynamic>.from(e)))
             .toList();
+        _resolveCurrentSessionFilename();
         notifyListeners();
       }
     } catch (e) {
       debugPrint('fetchHistory failed: $e');
     }
+  }
+
+  void _resolveCurrentSessionFilename() {
+    if (_currentSessionFilename != null) {
+      final exists = _historySessions.any(
+        (s) => s.filename == _currentSessionFilename,
+      );
+      if (exists) return;
+    }
+
+    if (_messages.isEmpty) return;
+
+    if (_sessionTitle.isNotEmpty && _sessionTitle != 'New Chat') {
+      final matchedByTitle = _historySessions.where(
+        (s) => s.title == _sessionTitle,
+      ).firstOrNull;
+      if (matchedByTitle != null) {
+        _currentSessionFilename = matchedByTitle.filename;
+        _previousSessionFilenames.add(matchedByTitle.filename);
+        return;
+      }
+    }
+
+    final newSession = _historySessions.where(
+      (s) => !_previousSessionFilenames.contains(s.filename),
+    ).firstOrNull;
+    if (newSession != null) {
+      _currentSessionFilename = newSession.filename;
+      _previousSessionFilenames.add(newSession.filename);
+      return;
+    }
+
+    _currentSessionFilename = _historySessions.firstOrNull?.filename;
   }
 
   Future<void> loadSession(String filename) async {
@@ -888,6 +965,7 @@ class CoderState extends ChangeNotifier {
         if (res.containsKey('mode') && res['mode'] != null) {
           _mode = res['mode'] as String;
         }
+        _previousSessionFilenames = _historySessions.map((s) => s.filename).toSet();
         _currentSessionFilename = filename;
         _sessionTitle = res['title'] as String? ?? 'Loaded Chat';
         if (res.containsKey('tokenCount')) {
@@ -1026,6 +1104,14 @@ class CoderState extends ChangeNotifier {
     }
 
     if (method == 'session/event' && params is Map) {
+      final fn = params['filename']?.toString() ??
+          params['id']?.toString() ??
+          params['sessionFilename']?.toString() ??
+          params['session_filename']?.toString() ??
+          params['sessionId']?.toString();
+      if (fn != null && fn.isNotEmpty) {
+        _currentSessionFilename = fn;
+      }
       if (params['type'] == 'title' && params.containsKey('title')) {
         _sessionTitle = params['title'] as String;
       } else if (params.containsKey('payload') && params['payload'] != null) {

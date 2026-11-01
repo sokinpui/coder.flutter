@@ -19,7 +19,7 @@ class SessionListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isSelected = state.currentSessionFilename == session.filename;
+    final isSelected = state.isSessionSelected(session);
 
     return ListTile(
       dense: true,
@@ -84,7 +84,7 @@ class SessionListItem extends StatelessWidget {
             onPressed: () async {
               final newTitle = controller.text.trim();
               if (newTitle.isEmpty || newTitle == session.title) return;
-              if (state.currentSessionFilename != session.filename) {
+              if (!state.isSessionSelected(session)) {
                 await state.loadSession(session.filename);
               }
               await state.renameSession(newTitle);

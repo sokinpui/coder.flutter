@@ -104,7 +104,7 @@ class _HistoryPageState extends State<HistoryPage> {
   Future<void> _handleRename(SessionInfo session, String newTitle) async {
     final trimmed = newTitle.trim();
     if (trimmed.isEmpty || trimmed == session.title) return;
-    if (widget.state.currentSessionFilename != session.filename) {
+    if (!widget.state.isSessionSelected(session)) {
       await widget.state.loadSession(session.filename);
     }
     await widget.state.renameSession(trimmed);
@@ -308,6 +308,7 @@ class _HistoryPageState extends State<HistoryPage> {
       itemBuilder: (context, index) {
         final session = filteredSessions[index];
         final timeLabel = _formatTimestamp(session);
+        final isSelected = widget.state.isSessionSelected(session);
 
         return Material(
           color: isDark ? AppTheme.surface : AppTheme.lightSurface,
@@ -319,7 +320,9 @@ class _HistoryPageState extends State<HistoryPage> {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: theme.dividerColor),
+                border: Border.all(
+                  color: isSelected ? AppTheme.primary : theme.dividerColor,
+                ),
               ),
               child: Row(
                 children: [
@@ -330,8 +333,8 @@ class _HistoryPageState extends State<HistoryPage> {
                       color: AppTheme.primary.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(
-                      Icons.chat_bubble_outline,
+                    child: Icon(
+                      isSelected ? Icons.chat_bubble : Icons.chat_bubble_outline,
                       size: 18,
                       color: AppTheme.primary,
                     ),
@@ -341,15 +344,38 @@ class _HistoryPageState extends State<HistoryPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          session.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: textColor,
-                          ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                session.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: isSelected ? AppTheme.primary : textColor,
+                                ),
+                              ),
+                            ),
+                            if (isSelected) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primary.withOpacity(0.18),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text(
+                                  'Current',
+                                  style: TextStyle(fontSize: 10, color: AppTheme.primary),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                         const SizedBox(height: 3),
                         Text(

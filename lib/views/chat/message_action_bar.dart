@@ -11,7 +11,6 @@ class MessageActionBar extends StatelessWidget {
     required this.isUser,
     this.onEdit,
     this.onApplyItf,
-    this.onUndoItf,
     this.onBranch,
     this.onRegenerate,
     this.onDelete,
@@ -21,7 +20,6 @@ class MessageActionBar extends StatelessWidget {
   final bool isUser;
   final VoidCallback? onEdit;
   final Future<void> Function(String content)? onApplyItf;
-  final Future<void> Function()? onUndoItf;
   final VoidCallback? onBranch;
   final VoidCallback? onRegenerate;
   final VoidCallback? onDelete;
@@ -79,7 +77,6 @@ class MessageActionBar extends StatelessWidget {
     final canBranch = onBranch != null;
     final canRegenerate = onRegenerate != null && !_isCommand;
     final canApplyItf = !isUser && _hasDiff && onApplyItf != null;
-    final canUndoItf = !isUser && onUndoItf != null;
     final canDelete = onDelete != null;
 
     return Padding(
@@ -110,14 +107,6 @@ class MessageActionBar extends StatelessWidget {
               tooltip: 'Apply diff changes',
               hoverColor: AppTheme.accentCyan,
               onTap: () => onApplyItf!(message.content),
-            ),
-          if (canUndoItf)
-            _TwitterActionButton(
-              icon: Icons.undo_rounded,
-              label: 'Undo',
-              tooltip: 'Undo last applied changes',
-              hoverColor: AppTheme.accentYellow,
-              onTap: onUndoItf,
             ),
           if (canEdit)
             _TwitterActionButton(

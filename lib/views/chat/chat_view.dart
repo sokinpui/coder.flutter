@@ -796,17 +796,6 @@ class _ChatViewState extends State<ChatView> {
                                   );
                                 }
                               },
-                              onUndoItf: () async {
-                                final summary = await widget.state.undoItf();
-                                if (summary != null && context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(summary),
-                                      duration: const Duration(seconds: 3),
-                                    ),
-                                  );
-                                }
-                              },
                             );
                           },
                         ),

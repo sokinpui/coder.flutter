@@ -22,7 +22,6 @@ class MessageBubble extends StatefulWidget {
     this.onDelete,
     this.onRegenerate,
     this.onApplyItf,
-    this.onUndoItf,
     this.onEdit,
     this.onBranch,
     this.isFirst = false,
@@ -36,7 +35,6 @@ class MessageBubble extends StatefulWidget {
   final int? activeSearchOccurrence;
   final VoidCallback? onDelete;
   final VoidCallback? onRegenerate;
-  final Future<void> Function()? onUndoItf;
   final Future<void> Function(String content)? onApplyItf;
   final ValueChanged<String>? onEdit;
   final VoidCallback? onBranch;
@@ -255,7 +253,6 @@ class _MessageBubbleState extends State<MessageBubble> {
                                   );
                                 },
                           onApplyItf: widget.onApplyItf,
-                          onUndoItf: widget.onUndoItf,
                           onBranch: widget.onBranch,
                           onRegenerate: widget.onRegenerate,
                           onDelete: widget.onDelete,

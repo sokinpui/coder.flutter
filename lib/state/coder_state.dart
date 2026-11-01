@@ -112,6 +112,10 @@ class CoderState extends ChangeNotifier {
     if (isSidebar != null) {
       _isSidebarVisible = isSidebar;
     }
+    final savedMode = settings['mode'] as String?;
+    if (savedMode != null && savedMode.isNotEmpty) {
+      _mode = savedMode;
+    }
     final modelStr = settings['activeModel'] as String?;
     if (modelStr != null && modelStr.isNotEmpty) {
       _activeModel = modelStr;
@@ -128,6 +132,7 @@ class CoderState extends ChangeNotifier {
       'themeMode': themeMode == ThemeMode.light ? 'light' : 'dark',
       'isSidebarVisible': _isSidebarVisible,
       'activeModel': _activeModel,
+      'mode': _mode,
     });
   }
 
@@ -302,6 +307,7 @@ class CoderState extends ChangeNotifier {
     _sessionTitle = 'New Chat';
     notifyListeners();
     await _initializeRemoteSession();
+    await fetchHistory();
   }
 
   Future<void> sendPrompt(String text, {List<Uint8List>? images}) async {
@@ -400,6 +406,20 @@ class CoderState extends ChangeNotifier {
       return;
     }
     _sessionTitle = trimmed;
+    if (_currentSessionFilename != null) {
+      final idx = _historySessions.indexWhere(
+        (s) => s.filename == _currentSessionFilename,
+      );
+      if (idx != -1) {
+        final old = _historySessions[idx];
+        _historySessions[idx] = SessionInfo(
+          filename: old.filename,
+          title: trimmed,
+          createdAt: old.createdAt,
+          modifiedAt: DateTime.now(),
+        );
+      }
+    }
     notifyListeners();
     try {
       await _client.request('session/rename', {'title': trimmed});
@@ -834,15 +854,23 @@ class CoderState extends ChangeNotifier {
 
   Future<void> fetchHistory() async {
     try {
-      final res = await _client.request('history/list');
-      if (res is List) {
-        _historySessions = res
+      final res = await _client.request('history/list', {'mode': 'all'});
+      dynamic data = res;
+      if (data is Map && data.containsKey('items')) {
+        data = data['items'];
+      } else if (data is Map && data.containsKey('sessions')) {
+        data = data['sessions'];
+      }
+      if (data is List) {
+        _historySessions = data
             .whereType<Map>()
             .map((e) => SessionInfo.fromJson(Map<String, dynamic>.from(e)))
             .toList();
         notifyListeners();
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('fetchHistory failed: $e');
+    }
   }
 
   Future<void> loadSession(String filename) async {
@@ -857,6 +885,9 @@ class CoderState extends ChangeNotifier {
       final res = await _client.request('history/load', {'filename': filename});
       if (res is Map) {
         final parsed = _parseMessagesFromRaw(res['messages'] as List?);
+        if (res.containsKey('mode') && res['mode'] != null) {
+          _mode = res['mode'] as String;
+        }
         _currentSessionFilename = filename;
         _sessionTitle = res['title'] as String? ?? 'Loaded Chat';
         if (res.containsKey('tokenCount')) {
@@ -879,6 +910,7 @@ class CoderState extends ChangeNotifier {
         _messages.clear();
         _messages.addAll(parsed);
         notifyListeners();
+        await fetchHistory();
       }
     } catch (e) {
       _errorMessage = 'Failed to load session: $e';

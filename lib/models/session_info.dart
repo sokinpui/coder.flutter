@@ -11,13 +11,21 @@ class SessionInfo {
       if (value is String && value.isNotEmpty) {
         return DateTime.tryParse(value);
       }
+      if (value is int && value > 0) {
+        return DateTime.fromMillisecondsSinceEpoch(
+          value > 1000000000000 ? value : value * 1000,
+        );
+      }
       return null;
     }
 
-    final fn = json['filename'] as String? ?? json['id'] as String? ?? '';
+    final fn = json['filename']?.toString() ?? json['id']?.toString() ?? '';
+    final rawTitle = json['title']?.toString();
     return SessionInfo(
       filename: fn,
-      title: json['title'] as String? ?? (fn.isNotEmpty ? fn : 'Untitled Chat'),
+      title: (rawTitle != null && rawTitle.isNotEmpty)
+          ? rawTitle
+          : (fn.isNotEmpty ? fn : 'Untitled Chat'),
       createdAt: parseDate(json['createdAt'] ?? json['created_at']),
       modifiedAt: parseDate(json['modifiedAt'] ?? json['modified_at']),
     );

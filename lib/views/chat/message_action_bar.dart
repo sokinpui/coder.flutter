@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/theme/app_theme.dart';
-import '../../core/widgets/hover_animated_button.dart';
 import '../../models/chat_message.dart';
 
 class MessageActionBar extends StatelessWidget {
@@ -76,90 +75,161 @@ class MessageActionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canEdit = message.author == MessageAuthor.user && onEdit != null;
+    final canBranch = onBranch != null;
+    final canRegenerate = onRegenerate != null && !_isCommand;
+    final canApplyItf = !isUser && _hasDiff && onApplyItf != null;
+    final canUndoItf = !isUser && onUndoItf != null;
+    final canDelete = onDelete != null;
+
     return Padding(
-      padding: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.only(top: 8),
       child: Wrap(
-        spacing: 2,
-        runSpacing: 2,
+        spacing: 4,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          if (message.author == MessageAuthor.user && onEdit != null)
-            HoverAnimatedButton(
-              tooltip: 'Edit Message',
-              hoverScale: 1.15,
+          if (canBranch)
+            _TwitterActionButton(
+              icon: Icons.fork_right_rounded,
+              tooltip: 'Branch conversation',
+              hoverColor: AppTheme.accentCyan,
+              onTap: onBranch,
+            ),
+          if (canRegenerate)
+            _TwitterActionButton(
+              icon: Icons.refresh_rounded,
+              tooltip: 'Regenerate response',
+              hoverColor: AppTheme.primary,
+              onTap: onRegenerate,
+            ),
+          if (canApplyItf)
+            _TwitterActionButton(
+              icon: Icons.auto_fix_high_rounded,
+              label: 'Apply ITF',
+              tooltip: 'Apply diff changes',
+              hoverColor: AppTheme.accentCyan,
+              onTap: () => onApplyItf!(message.content),
+            ),
+          if (canUndoItf)
+            _TwitterActionButton(
+              icon: Icons.undo_rounded,
+              label: 'Undo',
+              tooltip: 'Undo last applied changes',
+              hoverColor: AppTheme.accentYellow,
+              onTap: onUndoItf,
+            ),
+          if (canEdit)
+            _TwitterActionButton(
+              icon: Icons.edit_outlined,
+              tooltip: 'Edit message',
+              hoverColor: AppTheme.accentYellow,
               onTap: onEdit,
-              child: const Padding(
-                padding: EdgeInsets.all(6),
-                child: Icon(
-                  Icons.edit_outlined,
-                  size: 15,
-                  color: AppTheme.textMuted,
-                ),
-              ),
             ),
-          if (!isUser && _hasDiff && onApplyItf != null)
-            IconButton(
-              icon: const Icon(
-                Icons.auto_fix_high,
-                size: 15,
-                color: AppTheme.accentCyan,
-              ),
-              tooltip: 'Apply Changes (ITF)',
-              onPressed: () => onApplyItf!(message.content),
-              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-              padding: EdgeInsets.zero,
-            ),
-          if (!isUser && onUndoItf != null)
-            IconButton(
-              icon: const Icon(Icons.undo, size: 15, color: AppTheme.textMuted),
-              tooltip: 'Undo Last Applied Changes',
-              onPressed: onUndoItf,
-              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-              padding: EdgeInsets.zero,
-            ),
-          if (onBranch != null)
-            IconButton(
-              icon: const Icon(
-                Icons.fork_right_outlined,
-                size: 15,
-                color: AppTheme.textMuted,
-              ),
-              tooltip: 'Branch Conversation Here',
-              onPressed: onBranch,
-              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-              padding: EdgeInsets.zero,
-            ),
-          if (onRegenerate != null && !_isCommand)
-            IconButton(
-              icon: const Icon(
-                Icons.refresh,
-                size: 15,
-                color: AppTheme.textMuted,
-              ),
-              tooltip: 'Regenerate Turn',
-              onPressed: onRegenerate,
-              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-              padding: EdgeInsets.zero,
-            ),
-          IconButton(
-            icon: const Icon(Icons.copy, size: 14, color: AppTheme.textMuted),
-            tooltip: 'Copy Message',
-            onPressed: () => _copyContent(context),
-            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-            padding: EdgeInsets.zero,
+          _TwitterActionButton(
+            icon: Icons.copy_rounded,
+            tooltip: 'Copy content',
+            hoverColor: AppTheme.primary,
+            onTap: () => _copyContent(context),
           ),
-          if (onDelete != null)
-            IconButton(
-              icon: const Icon(
-                Icons.delete_outline,
-                size: 15,
-                color: AppTheme.textMuted,
-              ),
-              tooltip: 'Delete Message',
+          if (canDelete)
+            _TwitterActionButton(
+              icon: Icons.delete_outline_rounded,
+              tooltip: 'Delete message',
+              hoverColor: AppTheme.accentPink,
               onPressed: () => _confirmDelete(context),
-              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-              padding: EdgeInsets.zero,
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _TwitterActionButton extends StatefulWidget {
+  const _TwitterActionButton({
+    required this.icon,
+    required this.tooltip,
+    required this.hoverColor,
+    this.onTap,
+    this.onPressed,
+    this.label,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final Color hoverColor;
+  final VoidCallback? onTap;
+  final VoidCallback? onPressed;
+  final String? label;
+
+  @override
+  State<_TwitterActionButton> createState() => _TwitterActionButtonState();
+}
+
+class _TwitterActionButtonState extends State<_TwitterActionButton> {
+  bool _isHovered = false;
+
+  VoidCallback? get _effectiveAction => widget.onTap ?? widget.onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final activeColor = _isHovered ? widget.hoverColor : AppTheme.textMuted;
+    final bgColor = _isHovered
+        ? widget.hoverColor.withOpacity(0.12)
+        : Colors.transparent;
+
+    return Tooltip(
+      message: widget.tooltip,
+      waitDuration: const Duration(milliseconds: 600),
+      child: MouseRegion(
+        cursor: _effectiveAction != null
+            ? SystemMouseCursors.click
+            : SystemMouseCursors.basic,
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _effectiveAction,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 140),
+            padding: EdgeInsets.symmetric(
+              horizontal: widget.label != null ? 8 : 6,
+              vertical: 4,
+            ),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedScale(
+                  scale: _isHovered ? 1.12 : 1.0,
+                  duration: const Duration(milliseconds: 140),
+                  curve: Curves.easeOutCubic,
+                  child: Icon(
+                    widget.icon,
+                    size: 14.5,
+                    color: activeColor,
+                  ),
+                ),
+                if (widget.label != null) ...[
+                  const SizedBox(width: 4),
+                  Text(
+                    widget.label!,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: _isHovered
+                          ? FontWeight.w600
+                          : FontWeight.w500,
+                      color: activeColor,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

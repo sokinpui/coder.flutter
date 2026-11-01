@@ -613,15 +613,6 @@ class _ChatViewState extends State<ChatView> {
       }
     }
 
-    final isBackspaceOrDelete =
-        event.logicalKey == LogicalKeyboardKey.backspace ||
-        event.logicalKey == LogicalKeyboardKey.delete;
-    if (isBackspaceOrDelete &&
-        _promptController.text.isEmpty &&
-        _stagedAttachments.isNotEmpty) {
-      _removeStagedAttachment(_stagedAttachments.length - 1);
-      return KeyEventResult.handled;
-    }
 
     final isEnter =
         event.logicalKey == LogicalKeyboardKey.enter ||
@@ -768,8 +759,15 @@ class _ChatViewState extends State<ChatView> {
                             final isThisMsgActive =
                                 activeOcc?.messageIndex == index;
 
+                            final isUserTurn = msg.author == MessageAuthor.user ||
+                                msg.author == MessageAuthor.image;
+
                             return MessageBubble(
                               key: itemKey,
+                              isFirst: index == 0,
+                              isLast: index == messages.length - 1,
+                              isChild: !isUserTurn,
+                              activeModel: widget.state.activeModel,
                               searchPattern: _activeSearchPattern,
                               activeSearchOccurrence: isThisMsgActive
                                   ? activeOcc?.occurrenceIndexInMessage

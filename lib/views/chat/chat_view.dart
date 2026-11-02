@@ -227,33 +227,36 @@ class _ChatViewState extends State<ChatView> {
   }
 
   void _handleScrollNotification(ScrollNotification notification) {
+    final metrics = notification.metrics;
+    if (metrics.axis != Axis.vertical) return;
+
+    final isAtBottom = metrics.extentAfter <= 32.0;
+
     if (notification is UserScrollNotification) {
       if (notification.direction == ScrollDirection.forward) {
         _stickToBottom = false;
         if (!_showScrollToBottom) {
           setState(() => _showScrollToBottom = true);
         }
-      } else if (notification.direction == ScrollDirection.reverse) {
-        if (notification.metrics.extentAfter <= 36.0) {
-          _stickToBottom = true;
-          if (_showScrollToBottom) {
-            setState(() => _showScrollToBottom = false);
-          }
+      } else if (notification.direction == ScrollDirection.reverse && isAtBottom) {
+        _stickToBottom = true;
+        if (_showScrollToBottom) {
+          setState(() => _showScrollToBottom = false);
         }
       }
     } else if (notification is ScrollUpdateNotification) {
-      if (notification.metrics.extentAfter <= 24.0) {
+      final delta = notification.scrollDelta ?? 0.0;
+      if (delta < 0.0) {
+        _stickToBottom = false;
+        if (!_showScrollToBottom && metrics.extentAfter > 32.0) {
+          setState(() => _showScrollToBottom = true);
+        }
+      } else if (isAtBottom) {
         if (!_stickToBottom) {
           _stickToBottom = true;
           if (_showScrollToBottom) {
             setState(() => _showScrollToBottom = false);
           }
-        }
-      } else if (notification.dragDetails != null &&
-          (notification.scrollDelta ?? 0) < 0) {
-        _stickToBottom = false;
-        if (!_showScrollToBottom) {
-          setState(() => _showScrollToBottom = true);
         }
       }
     }

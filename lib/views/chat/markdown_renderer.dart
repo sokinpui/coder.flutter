@@ -202,8 +202,21 @@ class _MarkdownRendererState extends State<MarkdownRenderer> {
 class LatexSyntax extends m.InlineSyntax {
   LatexSyntax()
     : super(
-        r'(\$\$[\s\S]+?\$\$)|(\\\[[\s\S]+?\\\])|(\\\([\s\S]+?\\\))|((?<!\\)\$([^\$\s\n](?:[^\$\n]*?[^\$\s\n])?)\$)',
+        r'(\$\$[\s\S]+?\$\$)|(\\\[[\s\S]+?\\\])|(\\\([\s\S]+?\\\))|((?<!\\)\$(?!\s)((?:\\\$|\$(?=\d)|[^\$\n])+?)(?<!\s|\\)\$(?!\d))',
       );
+
+  static String sanitizeLatex(String raw) {
+    var text = raw.trim();
+    text = text.replaceAllMapped(
+      RegExp(r'(?<!\\text\{)\\\$'),
+      (_) => r'\text{\$}',
+    );
+    text = text.replaceAllMapped(
+      RegExp(r'(?<!\\|\$)\$([0-9])'),
+      (m) => '\\text{\\\$}${m[1]}',
+    );
+    return text;
+  }
 
   @override
   bool onMatch(m.InlineParser parser, Match match) {
@@ -268,10 +281,12 @@ class LatexNode extends SpanNode {
       return TextSpan(style: style, text: textContent);
     }
 
-    Widget latex;
+    final sanitized = LatexSyntax.sanitizeLatex(content);
+
+    Widget latexWidget;
     try {
-      latex = Math.tex(
-        content,
+      latexWidget = Math.tex(
+        sanitized,
         mathStyle: isInline ? MathStyle.text : MathStyle.display,
         textStyle: TextStyle(
           fontSize: isInline ? 13.5 : 14.5,
@@ -283,7 +298,7 @@ class LatexNode extends SpanNode {
         ),
       );
     } catch (_) {
-      latex = Text(
+      latexWidget = Text(
         isInline ? '\$$content\$' : '\$\$\n$content\n\$\$',
         style: style,
       );
@@ -294,7 +309,7 @@ class LatexNode extends SpanNode {
         alignment: PlaceholderAlignment.middle,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 2.0),
-          child: latex,
+          child: latexWidget,
         ),
       );
     }
@@ -315,7 +330,7 @@ class LatexNode extends SpanNode {
         ),
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          child: latex,
+          child: latexWidget,
         ),
       ),
     );

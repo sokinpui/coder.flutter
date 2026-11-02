@@ -22,6 +22,7 @@ class ChatMessage extends ChangeNotifier {
     this.imagePath,
     this.pdfPath,
     this.pdfName,
+    this.pdfPageCount,
     this.imageData,
     this.toolName,
     this.callId,
@@ -35,6 +36,7 @@ class ChatMessage extends ChangeNotifier {
   final String? imagePath;
   final String? pdfPath;
   final String? pdfName;
+  final int? pdfPageCount;
   final Uint8List? imageData;
   final String? toolName;
   final String? callId;

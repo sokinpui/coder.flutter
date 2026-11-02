@@ -68,7 +68,6 @@ class _ContextDialogState extends State<ContextDialog> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final files = widget.state.contextFiles;
-    final docs = widget.state.contextDocuments;
 
     return AlertDialog(
       backgroundColor: isDark ? AppTheme.surface : AppTheme.lightSurface,
@@ -78,7 +77,7 @@ class _ContextDialogState extends State<ContextDialog> {
           Icon(Icons.layers_outlined, color: AppTheme.accentCyan, size: 20),
           SizedBox(width: 8),
           Text(
-            'Project Context & Documents',
+            'Project Context Files',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
         ],
@@ -97,7 +96,7 @@ class _ContextDialogState extends State<ContextDialog> {
                     style: const TextStyle(fontSize: 13),
                     decoration: const InputDecoration(
                       hintText:
-                          'Add path or filename (e.g. lib/ or doc.pdf)...',
+                          'Add path or directory (e.g. lib/ or src/)...',
                       isDense: true,
                       contentPadding: EdgeInsets.symmetric(
                         horizontal: 10,
@@ -124,7 +123,7 @@ class _ContextDialogState extends State<ContextDialog> {
             ),
             const SizedBox(height: 14),
             Expanded(
-              child: files.isEmpty && docs.isEmpty
+              child: files.isEmpty
                   ? const Center(
                       child: Text(
                         'No project files or PDF documents currently in context.',
@@ -136,29 +135,6 @@ class _ContextDialogState extends State<ContextDialog> {
                     )
                   : ListView(
                       children: [
-                        if (docs.isNotEmpty) ...[
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 6),
-                            child: Text(
-                              'DOCUMENTS / PDFS (${docs.length})',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.accentYellow,
-                                letterSpacing: 0.8,
-                              ),
-                            ),
-                          ),
-                          for (final d in docs)
-                            _buildContextItem(
-                              path: d,
-                              icon: Icons.picture_as_pdf_outlined,
-                              iconColor: AppTheme.accentYellow,
-                              onDelete: () =>
-                                  widget.state.excludeContextPaths([d]),
-                            ),
-                          const SizedBox(height: 12),
-                        ],
                         if (files.isNotEmpty) ...[
                           Padding(
                             padding: const EdgeInsets.only(bottom: 6),
@@ -188,11 +164,11 @@ class _ContextDialogState extends State<ContextDialog> {
         ),
       ),
       actions: [
-        if (files.isNotEmpty || docs.isNotEmpty)
+        if (files.isNotEmpty)
           TextButton(
             style: TextButton.styleFrom(foregroundColor: AppTheme.accentPink),
             onPressed: () {
-              widget.state.excludeContextPaths([...files, ...docs]);
+              widget.state.excludeContextPaths(files);
             },
             child: const Text('Clear All Context'),
           ),

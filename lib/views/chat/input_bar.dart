@@ -14,7 +14,6 @@ class ChatInputBar extends StatelessWidget {
     required this.activeModel,
     required this.onOpenModelPicker,
     required this.tokenCount,
-    required this.contextDocumentsCount,
     required this.contextFilesCount,
     required this.isMac,
     required this.onAttachImage,
@@ -30,7 +29,6 @@ class ChatInputBar extends StatelessWidget {
   final String activeModel;
   final VoidCallback onOpenModelPicker;
   final int tokenCount;
-  final int contextDocumentsCount;
   final int contextFilesCount;
   final bool isMac;
   final VoidCallback onAttachImage;
@@ -224,43 +222,6 @@ class ChatInputBar extends StatelessWidget {
                                       ),
                                     ),
                                   ],
-                                ),
-                              ),
-                            ],
-                            if (contextDocumentsCount > 0) ...[
-                              const SizedBox(width: 6),
-                              InkWell(
-                                onTap: onOpenContextDialog,
-                                borderRadius: BorderRadius.circular(12),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isDark
-                                        ? AppTheme.surfaceSubtle
-                                        : AppTheme.lightSurfaceSubtle,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(
-                                        Icons.picture_as_pdf_outlined,
-                                        size: 12,
-                                        color: AppTheme.accentYellow,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        '$contextDocumentsCount doc${contextDocumentsCount == 1 ? '' : 's'}',
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          color: AppTheme.textMuted,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
                                 ),
                               ),
                             ],

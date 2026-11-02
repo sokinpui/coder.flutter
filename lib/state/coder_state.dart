@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 
+import '../models/staged_attachment.dart';
 import '../core/services/settings_service.dart';
 import '../core/rpc/coder_rpc_client.dart';
 import '../models/chat_message.dart';
@@ -36,7 +37,6 @@ class CoderState extends ChangeNotifier {
   List<String> _availableModels = [];
   bool _isSearchVisible = false;
   List<String> _contextFiles = [];
-  List<String> _contextDocuments = [];
   List<SessionInfo> _historySessions = [];
   final List<ChatMessage> _messages = [];
 
@@ -70,7 +70,6 @@ class CoderState extends ChangeNotifier {
   String? get currentSessionFilename => _currentSessionFilename;
   List<String> get availableModels => _availableModels;
   List<String> get contextFiles => List.unmodifiable(_contextFiles);
-  List<String> get contextDocuments => List.unmodifiable(_contextDocuments);
   List<SessionInfo> get historySessions => _historySessions;
   List<ChatMessage> get messages => List.unmodifiable(_messages);
   ConnectionStateStatus get connectionStatus => _connectionStatus;
@@ -315,13 +314,6 @@ class CoderState extends ChangeNotifier {
                   .toList() ??
               [];
         }
-        if (res.containsKey('contextDocuments')) {
-          _contextDocuments =
-              (res['contextDocuments'] as List?)
-                  ?.map((e) => e.toString())
-                  .toList() ??
-              [];
-        }
       }
       _sessionTitle = 'New Chat';
       _messages.clear();
@@ -340,7 +332,6 @@ class CoderState extends ChangeNotifier {
     _tokenCount = 0;
     _messages.clear();
     _contextFiles.clear();
-    _contextDocuments.clear();
     _sessionTitle = 'New Chat';
     _mode = 'chat';
     _isLoadingSession = true;
@@ -355,10 +346,15 @@ class CoderState extends ChangeNotifier {
     }
   }
 
-  Future<void> sendPrompt(String text, {List<Uint8List>? images}) async {
+  Future<void> sendPrompt(
+    String text, {
+    List<Uint8List>? images,
+    List<StagedAttachment>? pdfs,
+  }) async {
     final prompt = text.trim();
     final hasImages = images != null && images.isNotEmpty;
-    if (prompt.isEmpty && !hasImages) {
+    final hasPdfs = pdfs != null && pdfs.isNotEmpty;
+    if (prompt.isEmpty && !hasImages && !hasPdfs) {
       return;
     }
     if (_isGenerating) {
@@ -369,9 +365,27 @@ class CoderState extends ChangeNotifier {
     _streamTokenCount = 0;
     _isSearchVisible = false;
 
-    final effectivePrompt = prompt.isEmpty && hasImages
-        ? 'What is in this image?'
-        : prompt;
+    if (hasPdfs) {
+      _isGenerating = true;
+      notifyListeners();
+
+      for (final pdf in pdfs) {
+        final path = pdf.path;
+        if (path == null || path.isEmpty) continue;
+        await addPdf(path);
+      }
+
+      if (prompt.isEmpty && !hasImages) {
+        _isGenerating = false;
+        notifyListeners();
+        return;
+      }
+    }
+
+    for (final m in _messages) {
+      m.isGenerating = false;
+    }
+
     final baseTimestamp = DateTime.now().millisecondsSinceEpoch;
     var offset = 0;
 
@@ -388,12 +402,14 @@ class CoderState extends ChangeNotifier {
       }
     }
 
-    final userMsg = ChatMessage(
-      id: (baseTimestamp + offset++).toString(),
-      author: MessageAuthor.user,
-      content: effectivePrompt,
-    );
-    _messages.add(userMsg);
+    if (prompt.isNotEmpty) {
+      final userMsg = ChatMessage(
+        id: (baseTimestamp + offset++).toString(),
+        author: MessageAuthor.user,
+        content: prompt,
+      );
+      _messages.add(userMsg);
+    }
 
     final aiMsg = ChatMessage(
       id: (baseTimestamp + offset++).toString(),
@@ -408,7 +424,7 @@ class CoderState extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final params = <String, dynamic>{'content': effectivePrompt};
+      final params = <String, dynamic>{'content': prompt};
       if (hasImages) {
         params['images'] = images.map(base64Encode).toList();
       }
@@ -631,13 +647,6 @@ class CoderState extends ChangeNotifier {
                   .toList() ??
               [];
         }
-        if (res.containsKey('contextDocuments')) {
-          _contextDocuments =
-              (res['contextDocuments'] as List?)
-                  ?.map((e) => e.toString())
-                  .toList() ??
-              [];
-        }
         _messages.clear();
         _messages.addAll(parsed);
         notifyListeners();
@@ -662,6 +671,7 @@ class CoderState extends ChangeNotifier {
 
       final isImage = typeInt == 7;
       final isAssistant = typeInt == 1;
+      final isPdf = typeInt == 23;
       final isToolCall = typeInt == 20;
       final isToolResult = typeInt == 21;
 
@@ -710,9 +720,25 @@ class CoderState extends ChangeNotifier {
         }
       }
 
+      String? pdfPath;
+      String? pdfName;
+      int? pdfPageCount;
+      if (isPdf && content.isNotEmpty) {
+        try {
+          final meta = jsonDecode(content);
+          if (meta is Map) {
+            pdfName = meta['filename']?.toString();
+            pdfPath = meta['path']?.toString();
+            pdfPageCount = (meta['page_count'] as num?)?.toInt();
+          }
+        } catch (_) {}
+      }
+
       MessageAuthor author;
       if (isImage) {
         author = MessageAuthor.image;
+      } else if (isPdf) {
+        author = MessageAuthor.pdf;
       } else if (isAssistant) {
         author = MessageAuthor.assistant;
       } else if (isToolCall) {
@@ -744,6 +770,9 @@ class CoderState extends ChangeNotifier {
           author: author,
           content: content,
           imagePath: isImage ? content : null,
+          pdfPath: pdfPath ?? (isPdf ? content : null),
+          pdfName: pdfName ?? (isPdf ? content : null),
+          pdfPageCount: pdfPageCount,
           imageData: imgData,
           toolName: toolName,
           callId: callId,
@@ -829,6 +858,12 @@ class CoderState extends ChangeNotifier {
       }
       final res = await _client.request('session/pdf/add', params);
       if (res is Map) {
+        if (res.containsKey('messages')) {
+          final parsed = _parseMessagesFromRaw(res['messages'] as List?);
+          _messages.clear();
+          _messages.addAll(parsed);
+          notifyListeners();
+        }
         if (res.containsKey('tokenCount')) {
           _tokenCount = (res['tokenCount'] as num?)?.toInt() ?? _tokenCount;
         }
@@ -865,13 +900,6 @@ class CoderState extends ChangeNotifier {
         if (res.containsKey('contextFiles')) {
           _contextFiles =
               (res['contextFiles'] as List?)
-                  ?.map((e) => e.toString())
-                  .toList() ??
-              [];
-        }
-        if (res.containsKey('contextDocuments')) {
-          _contextDocuments =
-              (res['contextDocuments'] as List?)
                   ?.map((e) => e.toString())
                   .toList() ??
               [];
@@ -996,13 +1024,6 @@ class CoderState extends ChangeNotifier {
         if (res.containsKey('contextFiles')) {
           _contextFiles =
               (res['contextFiles'] as List?)
-                  ?.map((e) => e.toString())
-                  .toList() ??
-              [];
-        }
-        if (res.containsKey('contextDocuments')) {
-          _contextDocuments =
-              (res['contextDocuments'] as List?)
                   ?.map((e) => e.toString())
                   .toList() ??
               [];

@@ -525,8 +525,17 @@ class _MessageBubbleState extends State<MessageBubble> {
   }
 
   Widget _buildPdfPayload(BuildContext context, bool isDark) {
-    final name = widget.message.pdfName ?? widget.message.content;
+    var name = widget.message.pdfName ?? widget.message.content;
     final path = widget.message.pdfPath ?? widget.message.content;
+    final count = widget.message.pdfPageCount;
+    String countLabel = '';
+    if (count != null && count > 0) {
+      countLabel = ' ($count page${count == 1 ? '' : 's'})';
+    }
+    if (name.startsWith('{') && name.endsWith('}')) {
+      name = path.split(RegExp(r'[/\\]')).last;
+    }
+
     return InkWell(
       onTap: () => _openPdf(path),
       borderRadius: BorderRadius.circular(10),
@@ -549,7 +558,7 @@ class _MessageBubbleState extends State<MessageBubble> {
             const SizedBox(width: 10),
             Flexible(
               child: Text(
-                name,
+                '📄 $name$countLabel',
                 style: const TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 13,

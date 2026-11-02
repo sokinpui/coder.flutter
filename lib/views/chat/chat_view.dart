@@ -398,13 +398,7 @@ class _ChatViewState extends State<ChatView> {
     _promptController.clear();
     setState(() => _stagedAttachments.clear());
 
-    for (final pdf in pdfs) {
-      if (pdf.path != null) {
-        await widget.state.addPdf(pdf.path!);
-      }
-    }
-
-    widget.state.sendPrompt(text, images: images);
+    widget.state.sendPrompt(text, images: images, pdfs: pdfs);
     _scrollToBottom();
     _maintainInputFocus();
   }
@@ -456,23 +450,9 @@ class _ChatViewState extends State<ChatView> {
             type: AttachmentType.pdf,
             name: filename,
             path: path,
-            isUploading: true,
           );
           setState(() => _stagedAttachments.add(item));
           _stagedDraft.add(item);
-          try {
-            await widget.state.addPdf(path);
-            if (mounted) {
-              setState(() => item.isUploading = false);
-            }
-          } catch (_) {
-            if (mounted) {
-              setState(() {
-                item.isUploading = false;
-                item.error = 'Failed to upload PDF';
-              });
-            }
-          }
         } else {
           nonPdfPaths.add(path);
         }
@@ -633,6 +613,8 @@ class _ChatViewState extends State<ChatView> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final messages = widget.state.messages;
+    final showUploadingIndicator = widget.state.isGenerating &&
+        !messages.any((m) => m.isGenerating);
     if (messages.length != _lastMessageCount) {
       final wasNewMessage = messages.length > _lastMessageCount;
       _lastMessageCount = messages.length;
@@ -741,6 +723,34 @@ class _ChatViewState extends State<ChatView> {
                         ],
                       ),
                     )
+                  : messages.isEmpty && widget.state.isGenerating
+                      ? Center(
+                          key: const ValueKey('chat_submitting_placeholder'),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const SizedBox(
+                                width: 28,
+                                height: 28,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  color: AppTheme.primary,
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              Text(
+                                'Uploading...',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: isDark
+                                      ? AppTheme.textMuted
+                                      : AppTheme.lightTextMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
                   : messages.isEmpty
                 ? ChatEmptyState(
                     key: const ValueKey('chat_empty_state'),
@@ -778,8 +788,38 @@ class _ChatViewState extends State<ChatView> {
                             horizontal: 16,
                             vertical: 12,
                           ),
-                          itemCount: messages.length,
+                          itemCount: messages.length + (showUploadingIndicator ? 1 : 0),
                           itemBuilder: (context, index) {
+                            if (index == messages.length) {
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                  horizontal: 16,
+                                ),
+                                child: Row(
+                                  children: [
+                                    const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: AppTheme.primary,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      'Uploading...',
+                                      style: TextStyle(
+                                        fontSize: 12.5,
+                                        color: isDark
+                                            ? AppTheme.textMuted
+                                            : AppTheme.lightTextMuted,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
                             final msg = messages[index];
                             final Key itemKey = widget.state.isSearchVisible
                                 ? _messageKeys.putIfAbsent(msg.id, () => GlobalKey())
@@ -912,7 +952,6 @@ class _ChatViewState extends State<ChatView> {
             activeModel: widget.state.activeModel,
             onOpenModelPicker: _openModelPicker,
             tokenCount: widget.state.tokenCount,
-            contextDocumentsCount: widget.state.contextDocuments.length,
             contextFilesCount: widget.state.contextFiles.length,
             isMac: _isMac,
             onAttachImage: _handleAttachImage,

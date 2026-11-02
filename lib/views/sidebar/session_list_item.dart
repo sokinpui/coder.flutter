@@ -20,6 +20,8 @@ class SessionListItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isSelected = state.isSessionSelected(session);
+    final isLoadingThis =
+        state.isLoadingSession && state.loadingSessionFilename == session.filename;
 
     return ListTile(
       dense: true,
@@ -29,11 +31,20 @@ class SessionListItem extends StatelessWidget {
           : AppTheme.lightSurfaceSubtle,
       contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-      leading: Icon(
-        isSelected ? Icons.chat_bubble : Icons.chat_bubble_outline,
-        size: 16,
-        color: isSelected ? AppTheme.primary : AppTheme.textMuted,
-      ),
+      leading: isLoadingThis
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppTheme.primary,
+              ),
+            )
+          : Icon(
+              isSelected ? Icons.chat_bubble : Icons.chat_bubble_outline,
+              size: 16,
+              color: isSelected ? AppTheme.primary : AppTheme.textMuted,
+            ),
       title: Text(
         session.title,
         maxLines: 1,

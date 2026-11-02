@@ -188,9 +188,12 @@ class _ChatViewState extends State<ChatView> {
     });
   }
 
+  bool get _hasSingleScrollPosition =>
+      _scrollController.hasClients && _scrollController.positions.length == 1;
+
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
+      if (_hasSingleScrollPosition) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
           duration: const Duration(milliseconds: 200),
@@ -203,7 +206,7 @@ class _ChatViewState extends State<ChatView> {
   void _autoScrollToBottomIfAppropriate() {
     if (!_stickToBottom) return;
     if (widget.state.isSearchVisible) return;
-    if (!_scrollController.hasClients) return;
+    if (!_hasSingleScrollPosition) return;
     if (_isScrollPending) return;
 
     final target = _scrollController.position.maxScrollExtent;
@@ -213,7 +216,7 @@ class _ChatViewState extends State<ChatView> {
     _isScrollPending = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _isScrollPending = false;
-      if (!mounted || !_scrollController.hasClients || !_stickToBottom) return;
+      if (!mounted || !_hasSingleScrollPosition || !_stickToBottom) return;
       if (widget.state.isSearchVisible) return;
 
       final currentTarget = _scrollController.position.maxScrollExtent;
@@ -350,7 +353,7 @@ class _ChatViewState extends State<ChatView> {
         return;
       }
 
-      if (!_scrollController.hasClients || messages.isEmpty) return;
+      if (!_hasSingleScrollPosition || messages.isEmpty) return;
       final total = messages.length > 1 ? messages.length - 1 : 1;
       final fraction = (occ.messageIndex / total).clamp(0.0, 1.0);
       final targetOffset =
@@ -628,6 +631,7 @@ class _ChatViewState extends State<ChatView> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final messages = widget.state.messages;
     if (messages.length != _lastMessageCount) {
       final wasNewMessage = messages.length > _lastMessageCount;
@@ -710,7 +714,34 @@ class _ChatViewState extends State<ChatView> {
               transitionBuilder: (child, animation) {
                 return FadeTransition(opacity: animation, child: child);
               },
-              child: messages.isEmpty
+              child: widget.state.isLoadingSession
+                  ? Center(
+                      key: const ValueKey('chat_loading_session'),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const SizedBox(
+                            width: 26,
+                            height: 26,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: AppTheme.primary,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Text(
+                            'Loading conversation...',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: isDark
+                                  ? AppTheme.textMuted
+                                  : AppTheme.lightTextMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : messages.isEmpty
                 ? ChatEmptyState(
                     key: const ValueKey('chat_empty_state'),
                     activeModel: widget.state.activeModel,

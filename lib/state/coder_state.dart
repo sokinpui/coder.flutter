@@ -55,6 +55,8 @@ class CoderState extends ChangeNotifier {
   int _streamTokenCount = 0;
   bool _hasAttemptedConnection = false;
   Set<String> _previousSessionFilenames = {};
+  bool _isLoadingSession = false;
+  String? _loadingSessionFilename;
 
   String get serverHost => _serverHost;
   int get serverPort => _serverPort;
@@ -77,8 +79,13 @@ class CoderState extends ChangeNotifier {
   bool get isAutoReconnecting => _isAutoReconnecting;
   int get tokenCount => _tokenCount;
   bool get hasAttemptedConnection => _hasAttemptedConnection;
+  bool get isLoadingSession => _isLoadingSession;
+  String? get loadingSessionFilename => _loadingSessionFilename;
 
   bool isSessionSelected(SessionInfo session) {
+    if (_loadingSessionFilename != null) {
+      return _loadingSessionFilename == session.filename;
+    }
     if (_currentSessionFilename != null) {
       return _currentSessionFilename == session.filename;
     }
@@ -336,9 +343,16 @@ class CoderState extends ChangeNotifier {
     _contextDocuments.clear();
     _sessionTitle = 'New Chat';
     _mode = 'chat';
+    _isLoadingSession = true;
+    _loadingSessionFilename = null;
     notifyListeners();
-    await _initializeRemoteSession();
-    await fetchHistory();
+    try {
+      await _initializeRemoteSession();
+      await fetchHistory();
+    } finally {
+      _isLoadingSession = false;
+      notifyListeners();
+    }
   }
 
   Future<void> sendPrompt(String text, {List<Uint8List>? images}) async {
@@ -955,6 +969,7 @@ class CoderState extends ChangeNotifier {
   }
 
   Future<void> loadSession(String filename) async {
+    if (_isLoadingSession && _loadingSessionFilename == filename) return;
     _flushSmoothStream();
     _isGenerating = false;
     _isStreamDonePending = false;
@@ -962,6 +977,9 @@ class CoderState extends ChangeNotifier {
     _pendingContent = '';
     _pendingReasoning = '';
     _isSearchVisible = false;
+    _isLoadingSession = true;
+    _loadingSessionFilename = filename;
+    notifyListeners();
     try {
       final res = await _client.request('history/load', {'filename': filename});
       if (res is Map) {
@@ -991,11 +1009,13 @@ class CoderState extends ChangeNotifier {
         }
         _messages.clear();
         _messages.addAll(parsed);
-        notifyListeners();
         await fetchHistory();
       }
     } catch (e) {
       _errorMessage = 'Failed to load session: $e';
+    } finally {
+      _isLoadingSession = false;
+      _loadingSessionFilename = null;
       notifyListeners();
     }
   }
